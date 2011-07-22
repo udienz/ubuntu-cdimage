@@ -119,10 +119,10 @@ if [ -z "$CDIMAGE_NOSYNC" ]; then
 			exit 1
 		fi
 		push_cleanup "rm -f $SYNC_LOCK"
-		debmirrorsync #anonftpsync
+		. $CDIMAGE_ROOT/etc/debmirror debmirrorsync #anonftpsync
 		ARCHES_COLONS="$(echo "$CPUARCHES" | tr ' ' ':')"
 		if [ "$CDIMAGE_UNSUPPORTED" ]; then
-			ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.universe" anonftpsync
+			. $CDIMAGE_ROOT/etc/debmirror.universe anonftpsync
 			for component in main restricted; do
 				for distdir in "$CDIMAGE_ROOT/ftp/dists"/*; do
 					[ -d "$distdir" ] || continue

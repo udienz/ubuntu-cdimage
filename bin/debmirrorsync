@@ -8,12 +8,12 @@ set -e
 
 export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
 . "$CDIMAGE_ROOT/etc/config"
-. "$CDIMAGE_ROOT/etc/debmirror"
+#. "$CDIMAGE_ROOT/etc/debmirror"
 
 # TO is the destination for the base of the Debian mirror directory
 # (the dir that holds dists/ and ls-lR).
 
-TO="$CDIMAGE_ROOT/ftp"
+#TO="$CDIMAGE_ROOT/ftp"
 
 # Note: on some non-Debian systems, hostname doesn't accept -f option.
 # If that's the case on your system, make sure hostname prints the full
