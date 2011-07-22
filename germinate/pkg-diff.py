@@ -33,10 +33,10 @@ import Germinate.seeds
 import Germinate.version
 
 # TODO: cloned from germinate.py; should be common
-SEEDS = ["http://people.canonical.com/~ubuntu-archive/seeds/"]
-RELEASE = "ubuntu.natty"
+SEEDS = ["http://ironhide.udienz.web.id/canonical-seed/"]
+RELEASE = "ubuntu.oneiric"
 MIRRORS = ["http://archive.ubuntu.com/ubuntu/"]
-DIST = ["natty"]
+DIST = ["oneiric"]
 COMPONENTS = ["main"]
 ARCH = "i386"
 
