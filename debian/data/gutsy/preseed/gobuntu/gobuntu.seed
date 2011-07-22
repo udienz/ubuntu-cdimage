@@ -1,0 +1,7 @@
+# Disable the restricted component. (It should be missing from the CDs
+# anyway, but let's make sure.)
+d-i	apt-setup/restricted	boolean false
+# Disable the multiverse component.
+d-i	apt-setup/multiverse	boolean false
+# Install the Gobuntu desktop.
+tasksel	tasksel/first	multiselect gobuntu-desktop

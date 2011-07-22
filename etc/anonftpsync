@@ -1,0 +1,17 @@
+# Set parameters for anonftpsync here.
+
+# Full source location of an Ubuntu mirror that we can rsync from.  This can be
+# anything that rsync will accept as a source location:
+#   rsync_server::directory
+#   ssh_server:directory
+#   user@ssh_server:directory
+#   local_directory
+# For a list of public mirrors, see: https://wiki.ubuntu.com/Archive
+#
+# RSYNC_SRC=mirnyy.ubuntu.com::ftp
+
+# Additional rsync options when synchronizing our local Ubuntu mirror before the
+# build.  Use this to exclude architectures, file types etc. that you don't need
+# synchronized.
+#RSYNC_EXCLUDE="--exclude **/universe --exclude **/universe/** --exclude **/multiverse --exclude **/multiverse/**"
+

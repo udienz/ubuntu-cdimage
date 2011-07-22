@@ -1,0 +1,101 @@
+#! /bin/sh
+set -e
+
+# Execute a subsidiary command in the context of a given project.
+
+case $1 in
+	ubuntu)
+		export PROJECT=ubuntu
+		export CAPPROJECT=Ubuntu
+		;;
+	kubuntu)
+		export PROJECT=kubuntu
+		export CAPPROJECT=Kubuntu
+		;;
+	kubuntu-kde4)
+		export PROJECT=kubuntu-kde4
+		export CAPPROJECT=Kubuntu-KDE4
+		;;
+	kubuntu-netbook)
+		export PROJECT=kubuntu-netbook
+		export CAPPROJECT=Kubuntu-Netbook
+		;;
+	kubuntu-mobile)
+		export PROJECT=kubuntu-mobile
+		export CAPPROJECT=Kubuntu-Mobile
+		;;
+	edubuntu)
+		export PROJECT=edubuntu
+		export CAPPROJECT=Edubuntu
+		;;
+	xubuntu)
+		export PROJECT=xubuntu
+		export CAPPROJECT=Xubuntu
+		;;
+	gobuntu)
+		export PROJECT=gobuntu
+		export CAPPROJECT=Gobuntu
+		;;
+	ubuntu-server)
+		export PROJECT=ubuntu-server
+		export CAPPROJECT=Ubuntu-Server
+		;;
+	ubuntu-netbook)
+		export PROJECT=ubuntu-netbook
+		export CAPPROJECT=Ubuntu-Netbook
+		;;
+	ubuntustudio)
+		export PROJECT=ubuntustudio
+		export CAPPROJECT=Ubuntu-Studio
+		;;
+	mythbuntu)
+		export PROJECT=mythbuntu
+		export CAPPROJECT=Mythbuntu
+		;;
+	lubuntu)
+		export PROJECT=lubuntu
+		export CAPPROJECT=Lubuntu
+		;;
+	ubuntu-moblin-remix)
+		export PROJECT=ubuntu-moblin-remix
+		export CAPPROJECT=Ubuntu-Moblin-Remix
+		;;
+	tocd3)
+		export PROJECT=tocd3
+		export CAPPROJECT=TheOpenCDv3
+		;;
+	tocd3.1)
+		export PROJECT=tocd3.1
+		export CAPPROJECT=TheOpenCDv3.1
+		;;
+	*)
+		cat <<EOF >&2
+Usage: for-project PROJECT [COMMAND ARGS...]
+Recognised projects:
+  ubuntu
+  kubuntu
+  kubuntu-kde4
+  kubuntu-netbook
+  kubuntu-mobile
+  edubuntu
+  xubuntu
+  gobuntu
+  ubuntu-server
+  ubuntu-netbook
+  ubuntustudio
+  mythbuntu
+  lubuntu
+  ubuntu-moblin-remix
+  tocd3
+  tocd3.1
+EOF
+		exit 1
+		;;
+esac
+shift
+
+if [ $# -eq 0 ]; then
+	exec "${SHELL:-/bin/sh}" -i
+else
+	exec "$@"
+fi

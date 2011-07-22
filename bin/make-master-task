@@ -1,0 +1,48 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ]; then
+	echo 'Usage: make-master-task structure' >&2
+	exit 1
+fi
+
+STRUCTURE="$1"
+
+if [ "$CDIMAGE_ADDON" ]; then
+	SEEDS="$(list-seeds "$STRUCTURE" addon)"
+elif [ "$CDIMAGE_ONLYSOURCE" ]; then
+	SEEDS="$(list-seeds "$STRUCTURE" all)"
+else
+	SEEDS="$(list-seeds "$STRUCTURE" installer)"
+	if [ "$CDIMAGE_DVD" ]; then
+		SEEDS="$SEEDS $(list-seeds "$STRUCTURE" dvd | egrep -v '^(installer|casper)$' || true)"
+	elif [ "$CDIMAGE_INSTALL" ]; then
+		SEEDS="$SEEDS $(list-seeds "$STRUCTURE" tasks | egrep -v '^(installer|casper)$' || true)"
+	else
+		if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+			SEEDS="$SEEDS $(list-seeds "$STRUCTURE" base | egrep -v '^(installer|casper)$' || true)"
+		fi
+		if [ "$CDIMAGE_LIVE" = 1 ]; then
+			SEEDS="$SEEDS $(list-seeds "$STRUCTURE" ship-live | egrep -v '^(installer|casper)$' || true)"
+		fi
+	fi
+fi
+
+if [ -z "$SEEDS" ]; then
+       echo 'Error! SEEDS is empty' >&2
+       exit 1
+fi
+
+for seed in $SEEDS; do
+	# https://blueprints.launchpad.net/ubuntu/+spec/edubuntu-on-two-cds
+	if [ "$CDIMAGE_DVD" != 1 ] && [ "$CDIMAGE_ADDON" != 1 ] && \
+	   [ "$seed" = ship-addon ]; then
+		echo FORCE-CD-BREAK
+	fi
+	echo "#include <$PROJECT/$DIST/$seed>"
+done
+
+exit 0

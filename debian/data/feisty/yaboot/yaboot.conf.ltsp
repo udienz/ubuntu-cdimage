@@ -1,0 +1,24 @@
+
+# PowerPC subarch 
+image=/install/powerpc/vmlinux
+	label=ltsp-server
+	alias=ltsp-server-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="file=/cdrom/preseed/ltsp.seed --"
+	initrd-size=8192
+	read-only
+
+# PowerPC64 subarch
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=ltsp-server
+	initrd=/install/powerpc64/initrd.gz
+	append="file=/cdrom/preseed/ltsp.seed --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=ltsp-server-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="file=/cdrom/preseed/ltsp.seed --"
+	initrd-size=8192
+	read-only

@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# post-boot-hppa
+#
+# Do post-image-building tasks for hppa, to make CDs bootable.
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+# $3 is the image file
+
+. $BASEDIR/tools/boot/$DI_CODENAME/common.sh
+
+set -e
+
+N=$1
+CDROOT=$2
+CDIMAGE=$3
+
+cd $CDROOT/..
+
+# Only disk 1* bootable
+if [ $N != 1 -a $N != 1_NONUS ]; then
+	exit 0
+fi
+
+default_preseed
+
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    EXTRA_ARGS='boot=casper splash'
+    KERNEL32=casper/vmlinux-hppa32
+    KERNEL64=casper/vmlinux-hppa64
+    # TODO: we're screwed here, because mkisofs only supports one ramdisk.
+    # Pick hppa32 arbitrarily for now.
+    RAMDISK=casper/initrd.gz
+else
+    EXTRA_ARGS=
+    KERNEL32=install/vmlinux-hppa32
+    KERNEL64=install/vmlinux-hppa64
+    RAMDISK=install/initrd.gz
+fi
+
+/sbin/palo \
+     --commandline="0/vmlinux $DEFAULT_PRESEED $EXTRA_ARGS root=/dev/ram initrd=0/ramdisk ramdisk_size=1048576" \
+     --recoverykernel="$CDROOT/$KERNEL32" \
+     --recoverykernel="$CDROOT/$KERNEL64" \
+     --bootloader="$CDROOT/install/iplboot" \
+     --ramdisk="$CDROOT/$RAMDISK" \
+     --init-cdrom=$CDIMAGE --configfile=/dev/null

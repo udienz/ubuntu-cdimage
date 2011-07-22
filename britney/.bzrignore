@@ -1,0 +1,6 @@
+./data
+./report
+update_out/Makefile.dep
+update_out/aptvercmp
+update_out/checklib
+update_out/freelist

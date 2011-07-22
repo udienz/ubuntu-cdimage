@@ -1,0 +1,13 @@
+# Build an LTSP client chroot.
+d-i	mythbuntu-diskless-client-builder/run	boolean true
+# install the client-builder udeb
+d-i anna/choose_modules string mythbuntu-diskless-client-builder
+# let the user handle task selection
+# tasksel	tasksel/first	multiselect mythbuntu-desktop
+d-i	pkgsel/include	string mythbuntu-diskless-server dhcp3-server
+# ask the user to which network he wants to export the overlay directory
+# not optimal from an usability POV, but at least it works
+mythbuntu-diskless mythbuntu-diskless/create_share boolean true
+# No XFCE translation packages yet.
+d-i	pkgsel/install-language-support	boolean false
+d-i	pkgsel/language-pack-patterns	string

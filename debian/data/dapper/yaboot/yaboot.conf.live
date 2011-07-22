@@ -1,0 +1,46 @@
+
+# PowerPC subarch 
+image=/casper/powerpc/vmlinux
+	label=live
+	alias=live-powerpc
+	initrd=/casper/powerpc/initrd.gz
+	append="${DEFAULT_PRESEED} boot=casper quiet splash --"
+	initrd-size=1048576
+	read-only
+
+image=/casper/powerpc/vmlinux
+	label=live-nosplash
+	alias=live-nosplash-powerpc
+	initrd=/casper/powerpc/initrd.gz
+	append="${DEFAULT_PRESEED} boot=casper quiet --"
+	initrd-size=1048576
+	read-only
+
+# PowerPC64 subarch
+image[macrisc4]=/casper/powerpc64/vmlinux
+	label=live
+	initrd=/casper/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} boot=casper quiet splash --"
+	initrd-size=1048576
+	read-only
+
+image[macrisc4]=/casper/powerpc64/vmlinux
+	label=live-nosplash
+	initrd=/casper/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} boot=casper quiet --"
+	initrd-size=1048576
+	read-only
+
+image=/casper/powerpc64/vmlinux
+	label=live-powerpc64
+	initrd=/casper/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} boot=casper quiet splash --"
+	initrd-size=1048576
+	read-only
+
+image=/casper/powerpc64/vmlinux
+	label=live-nosplash-powerpc64
+	initrd=/casper/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} boot=casper quiet --"
+	initrd-size=1048576
+	read-only

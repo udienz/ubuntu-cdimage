@@ -1,0 +1,11 @@
+# Adjust the default hostname.
+d-i	netcfg/get_hostname	string edubuntu
+# Install the Edubuntu usplash image.
+d-i	base-installer/kernel/linux/extra-packages-2.6	string usplash edubuntu-artwork-usplash
+# Adjust task names for Edubuntu.
+d-i	archive-copier/desktop-task	string edubuntu-standard|edubuntu-desktop
+d-i	archive-copier/ship-task	string edubuntu-ship
+# Install the Edubuntu desktop.
+d-i	pkgsel/install-pattern	string ~t^edubuntu-standard$|~t^edubuntu-desktop$
+# Install both GNOME and KDE translation packages.
+d-i	pkgsel/language-pack-patterns	string language-pack-gnome-$LL language-pack-kde-$LL kde-i18n-$LL

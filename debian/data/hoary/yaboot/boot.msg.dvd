@@ -1,0 +1,24 @@
+Welcome to Ubuntu ${DEBIAN_VERSION} (${CODENAME})!
+
+This is an Ubuntu DVD, built on ${BUILD_DATE}.
+
+The default option is 'install'. For maximum
+control, you can use the 'expert' option. Use the
+'live' option to run a preinstalled system from the
+DVD.
+
+If the system fails to boot at all (the typical
+symptom is a white screen which doesn't go away),
+use 'install video=ofonly', 'expert video=ofonly', or
+'live video=ofonly'.
+
+The plain options are for the powerpc family of
+processors (from 601 to G4). The *-power3 options
+are for IBM Power3 boxes, and the *-power4 options
+are for IBM Power4 and Apple G5 boxes. Press the tab
+key for a list of options, or type 'help' for help.
+
+************************************
+If in doubt, just press Enter, and if that
+doesn't work, type 'install video=ofonly'.
+************************************

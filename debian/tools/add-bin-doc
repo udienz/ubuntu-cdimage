@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#set -x
+set -e
+
+BDIR=$TDIR/$CODENAME-$FULLARCH
+ADIR=$APTTMP/$CODENAME-$FULLARCH
+SDIR=$TDIR/$CODENAME-src
+
+DEBMAINVER="`echo $DEBVERSION | sed -e 's/[ _r].*//'`"
+
+if [ "$OMIT_RELEASE_NOTES"x = ""x ] ; then
+	OMIT_RELEASE_NOTES=0
+fi
+
+if [ "$OMIT_MANUAL"x = ""x ] ; then
+	OMIT_MANUAL=0
+fi
+
+for i in $BDIR/*.packages; do 
+	dir=${i%%.packages}
+	DISK=${dir##$BDIR/}
+	dir=$BDIR/CD$DISK
+
+	mkdir -p $dir/pics 
+	cp -p $BASEDIR/data/pics/*.* $dir/pics/ 
+
+	if [ -e $MIRROR/dists/$CODENAME/main/Release-Notes ]; then 
+	   cp -pf $MIRROR/dists/$CODENAME/main/Release-Notes $dir/
+	fi
+
+	if [ "$INSTALLER_CD" = "0" ]; then
+	    if [ -e $MIRROR/dists/$CODENAME/Contents-$ARCH.gz ]; then
+	       cp -pf $MIRROR/dists/$CODENAME/Contents-$ARCH.gz $dir/dists/$CODENAME/
+	    else
+	       echo "WARNING: there's no Contents-$ARCH.gz file for $CODENAME !"
+	    fi
+	fi
+
+        if [ -n "$NONUS" ]
+	then
+	    if [ -e $NONUS/dists/$CODENAME/non-US/Contents-$ARCH.gz ]; then
+		 cp -pf $NONUS/dists/$CODENAME/non-US/Contents-$ARCH.gz \
+		    $dir/dists/$CODENAME/non-US/
+	    else
+		echo "WARNING: there's no Content-$ARCH.gz file for $CODENAME/non-US !"
+	    fi
+	fi
+
+	if [ -e $BASEDIR/data/$CODENAME/README.$ARCH ]; then 
+	  cp -pf $BASEDIR/data/$CODENAME/README.$ARCH $dir/
+	fi
+
+	if [ -e $BASEDIR/data/$CODENAME/README.1ST.$ARCH ]; then 
+	    rm -f $dir/README.1ST
+	    echo "This disc is labelled :" > $dir/README.1ST
+	    cat $dir/.disk/info >>$dir/README.1ST
+	    echo -e "\n\n" >>$dir/README.1ST
+	    cat $BASEDIR/data/$CODENAME/README.1ST.$ARCH > $dir/README.1ST
+	    todos $dir/README.1ST
+	fi
+
+	if [ -e $BASEDIR/data/$CODENAME/README.multicd ]; then 
+	    cp -pf $BASEDIR/data/$CODENAME/README.multicd $dir/
+	fi
+
+done

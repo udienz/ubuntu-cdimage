@@ -1,0 +1,3 @@
+tasksel tasksel/first multiselect mobile-netbook-remix
+d-i	preseed/early_command	string . /usr/share/debconf/confmodule; db_get debconf/priority; case $RET in low|medium) db_fset tasksel/first seen false ;; esac
+d-i passwd/auto-login boolean true

@@ -1,0 +1,19 @@
+Source: germinate
+Section: utils
+Priority: optional
+Maintainer: Colin Watson <cjwatson@ubuntu.com>
+Standards-Version: 3.8.4
+Build-Depends: debhelper (>= 7.0.50~)
+Build-Depends-Indep: python (>= 2.6.5-2)
+Vcs-Bzr: http://people.canonical.com/~cjwatson/bzr/germinate/mainline
+XS-Python-Version: >= 2.4
+
+Package: germinate
+Architecture: all
+Depends: ${misc:Depends}, ${python:Depends}, ${perl:Depends}, python-apt (>= 0.7.93.2~)
+XB-Python-Version: ${python:Versions}
+Description: Expand dependencies in a list of seed packages
+ Germinate takes lists of seed packages and expands their dependencies to
+ produce a full list of packages. This can be used for purposes such as
+ managing the list of packages present in a derived distribution's archive
+ or CD builds.

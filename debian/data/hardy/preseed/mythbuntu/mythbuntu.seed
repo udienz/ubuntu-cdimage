@@ -1,0 +1,5 @@
+# let the user handle task selection
+# tasksel	tasksel/first	multiselect mythbuntu-desktop
+d-i	pkgsel/install-language-support	boolean false
+# No XFCE translation packages yet.
+d-i	pkgsel/language-pack-patterns	string

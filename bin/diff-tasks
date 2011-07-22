@@ -1,0 +1,19 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ]; then
+	echo 'Usage: diff-tasks IMAGE_TYPE' >&2
+	exit 1
+fi
+IMAGE_TYPE="$1"
+
+GERMINATE_OUT="$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/germinate"
+SCRATCH="$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/tasks"
+PREVIOUS="$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/tasks-previous"
+
+for seed in MASTER $(list-seeds "$GERMINATE_OUT/$DIST/STRUCTURE" all); do
+	diff -u "$PREVIOUS/$DIST/$seed" "$SCRATCH/$DIST/$seed" || true
+done

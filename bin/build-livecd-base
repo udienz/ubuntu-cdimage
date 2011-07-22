@@ -1,0 +1,49 @@
+#! /bin/sh
+set -e
+
+export ARCHES="${ARCHES:-amd64 hppa i386 ia64 powerpc sparc}"
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+PATH="$CDIMAGE_ROOT/bin${PATH:+:$PATH}"
+
+export CDIMAGE_LIVE=1
+
+# This is a special case; don't use for-project.
+export PROJECT=livecd-base
+export IMAGE_TYPE=livecd-base
+
+if ! lockfile -l 7200 -r 0 "$CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE"; then
+	echo "Another image set is already building!" >&2
+	exit 1
+fi
+trap "code=\$?; rm -f $CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE; exit \$code" EXIT HUP INT QUIT TERM
+
+export CDIMAGE_DATE="$(next-build-date "$IMAGE_TYPE")"
+
+if [ -z "$DEBUG" ]; then
+	mkdir -p "$CDIMAGE_ROOT/log/$PROJECT/$DIST"
+	exec >"$CDIMAGE_ROOT/log/$PROJECT/$DIST/$IMAGE_TYPE-$CDIMAGE_DATE.log" 2>&1
+fi
+
+echo "===== Downloading live filesystem images ====="
+date
+download-live-filesystems
+
+if [ -z "$DEBUG" ]; then
+	echo "===== Publishing ====="
+	date
+	publish-livecd-base "$CDIMAGE_DATE" "$IMAGE_TYPE"
+
+	echo "===== Purging old images ====="
+	date
+	purge-old-images "$IMAGE_TYPE"
+
+	echo "===== Triggering mirrors ====="
+	date
+	sync-mirrors
+fi
+
+echo "===== Finished ====="
+date

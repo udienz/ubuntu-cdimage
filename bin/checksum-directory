@@ -1,0 +1,71 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+usage () {
+	echo 'Usage: checksum-directory [--map SED_COMMAND] DIR [OLD_DIR ...]' >&2
+	exit 1
+}
+
+MAP=
+if [ "x$1" = "x--map" ]; then
+	if [ -z "$2" ]; then
+		usage
+	fi
+	MAP="$2"
+	shift 2
+fi
+
+if [ -z "$1" ]; then
+	usage
+fi
+
+DIR="$1"
+shift
+OLD_DIRS="$@"
+
+checksum () {
+	program="$1"
+	file="$2"
+
+	find "$DIR/" -maxdepth 1 \( -name \*.img -o -name \*.iso -o -name \*.exe -o -name \*.img.gz -o -name \*vmlinuz-* \) -printf '%P\n' | \
+	while read image; do
+		found=false
+		for dir in $DIR $OLD_DIRS; do
+			if [ "$MAP" ]; then
+				old_image="$(echo "$image" | sed "$MAP")"
+			else
+				old_image="$image"
+			fi
+			[ -e "$dir/$file" ] || continue
+			# If we find the image in a previous file, then make
+			# sure to take the last (and thus presumably the
+			# most recent) checksum, just in case.
+			if grep -q "[ *]$image\$" "$dir/$file"; then
+				grep "[ *]$image\$" "$dir/$file" | tail -n1
+				found=:
+				break
+			elif [ "$MAP" ]; then
+				checksum="$(grep -s "[ *]$old_image\$" "$dir/$file" | tail -n1 | cut -d' ' -f1)" || true
+				if [ "$checksum" ]; then
+					echo "$checksum *$image"
+					found=:
+					break
+				fi
+			fi
+		done
+		if ! "$found"; then
+			(cd "$DIR" && $program "$image")
+		fi
+	done | sort -k2 > "$DIR/$file.new"
+	mv "$DIR/$file.new" "$DIR/$file"
+	sign-cdimage "$DIR/$file"
+}
+
+checksum 'md5sum -b' 'MD5SUMS'
+checksum 'sha1sum -b' 'SHA1SUMS'
+checksum 'sha256sum -b' 'SHA256SUMS'
+
+exit 0

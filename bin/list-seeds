@@ -1,0 +1,146 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+	echo 'Usage: list-seeds structure all|tasks|installer|debootstrap|base|ship-live|addon|dvd' >&2
+	exit 1
+fi
+
+STRUCTURE="$1"
+MODE="$2"
+
+add_inheritance () {
+	case " $inherit " in
+		*" $1 "*)
+			;;
+		*)
+			inherit="${inherit:+$inherit }$1"
+			;;
+	esac
+}
+
+expand_inheritance () {
+	for seed in $(grep "^$1:" "$STRUCTURE" | cut -d: -f2); do
+		expand_inheritance "$seed"
+	done
+	add_inheritance "$1"
+}
+
+inheritance () {
+	inherit=
+	expand_inheritance "$1"
+	echo "$inherit"
+}
+
+case $MODE in
+	all)
+		grep -v '^#' "$STRUCTURE" | cut -d: -f1
+		;;
+	tasks)
+		SHIP=ship
+		if grep -q "^ship-addon:" "$STRUCTURE"; then
+			SHIP=ship-addon
+		fi
+		case $PROJECT in
+			ubuntu-server)
+				if dist_le breezy; then
+					:
+				elif dist_le dapper; then
+					SHIP=server
+				else
+					SHIP=server-ship
+				fi
+				;;
+			kubuntu-mobile)
+				SHIP=mobile-ship
+				;;
+		esac
+		inheritance "$SHIP"
+		if [ "$CDIMAGE_DVD" ]; then
+			if dist_ge edgy; then
+				# TODO cjwatson 2007-04-18: hideous hack to
+				# fix DVD tasks
+				echo dns-server
+				echo lamp-server
+			fi
+		fi
+		;;
+	installer)
+		if [ "$CDIMAGE_INSTALL_BASE" ]; then
+			echo 'installer'
+		fi
+		if [ "$CDIMAGE_LIVE" ]; then
+			if dist_ge hoary && dist_le breezy; then
+				echo 'casper'
+			fi
+		fi
+		;;
+	debootstrap)
+		if dist_le hoary; then
+			echo 'base'
+		elif dist_le feisty; then
+			echo 'minimal'
+		else
+			echo 'required minimal'
+		fi
+		;;
+	base)
+		if dist_le hoary; then
+			echo 'base'
+		elif dist_le breezy; then
+			echo 'minimal standard'
+		elif dist_le feisty; then
+			echo 'boot minimal standard'
+		else
+			echo 'boot required minimal standard'
+		fi
+		;;
+	ship-live)
+		case $PROJECT in
+			kubuntu-netbook)
+				echo 'ship-netbook-live'
+				;;
+			kubuntu-mobile)
+				echo 'ship-mobile-live'
+				;;
+			*)
+				if dist_ge dapper; then
+					echo 'ship-live'
+				fi
+				;;
+		esac
+		;;
+	addon)
+		SHIP="$(inheritance ship)"
+		SHIP_ADDON="$(inheritance ship-addon)"
+		for seed in $SHIP_ADDON; do
+			case " $SHIP " in
+				*" $seed "*)
+					;;
+				*)
+					echo "$seed"
+					;;
+			esac
+		done
+		;;
+	dvd)
+		if dist_le gutsy; then
+			inheritance supported
+		elif dist_le karmic; then
+			inheritance dvd
+		else
+			if [ "$PROJECT" = edubuntu ]; then
+				# no inheritance; most of this goes on the
+				# live filesystem
+				echo 'dvd ship-live'
+			else
+				inheritance dvd
+			fi
+		fi
+		;;
+esac
+
+exit 0

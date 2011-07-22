@@ -1,0 +1,9 @@
+Welcome to Ubuntu ${DEBIAN_VERSION} (${CODENAME})!
+
+This is an Ubuntu live ${MEDIA_TYPE},
+built on ${BUILD_DATE}.
+
+The default option is 'live'.
+
+If in doubt, just press Enter.
+

@@ -1,0 +1,28 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+IMAGE_TYPE="${1:-daily}"
+STAMP="$CDIMAGE_ROOT/etc/.next-build-suffix-$PROJECT-$IMAGE_TYPE"
+DATE="${DATE:-$(date +%Y%m%d)}"
+
+SUFFIX=
+if [ "$DATE_SUFFIX" ]; then
+	SUFFIX="$DATE_SUFFIX"
+elif grep -qs "^$DATE:" "$STAMP"; then
+	SUFFIX="$(grep -s "^$DATE:" "$STAMP" | cut -d: -f2)"
+fi
+
+if [ "$SUFFIX" ]; then
+	if [ -z "$DEBUG" ]; then
+		echo "$DATE:$(($SUFFIX + 1))" > "$STAMP"
+	fi
+	echo "$DATE.$SUFFIX"
+else
+	if [ -z "$DEBUG" ]; then
+		echo "$DATE:1" > "$STAMP"
+	fi
+	echo "$DATE"
+fi

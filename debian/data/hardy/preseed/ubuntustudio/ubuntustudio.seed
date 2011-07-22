@@ -1,0 +1,4 @@
+# Only show Ubuntu Studio tasks.
+tasksel	tasksel/limit-tasks	string ubuntustudio-audio, ubuntustudio-audio-plugins, ubuntustudio-desktop, ubuntustudio-graphics, ubuntustudio-video
+# Language support is expected to be missing.
+d-i	pkgsel/install-language-support	boolean false

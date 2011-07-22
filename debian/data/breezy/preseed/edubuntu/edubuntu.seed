@@ -1,0 +1,15 @@
+# Adjust the default hostname.
+d-i	netcfg/get_hostname	string edubuntu
+# Default to manual network configuration.
+d-i	netcfg/disable_dhcp	boolean true
+# Install the Edubuntu usplash image.
+d-i	base-installer/kernel/linux/extra-packages-2.6	string usplash edubuntu-artwork-usplash
+# Adjust task names for Edubuntu, and copy the server.
+d-i	archive-copier/desktop-task	string edubuntu-standard|edubuntu-desktop|edubuntu-server
+d-i	archive-copier/ship-task	string edubuntu-ship
+# Install the Edubuntu desktop and server.
+base-config	base-config/package-selection	string ~tedubuntu-standard|~tedubuntu-desktop|~tedubuntu-server
+# Build a client chroot.
+base-config	base-config/late_command	string /usr/sbin/ltsp-update-sshkeys
+# Install both GNOME and KDE translation packages.
+base-config	base-config/language-pack-patterns	string language-pack-$LL language-pack-gnome-$LL language-pack-kde-$LL kde-i18n-$LL

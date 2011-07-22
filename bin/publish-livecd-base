@@ -1,0 +1,64 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ]; then
+	echo 'Usage: publish-livecd-base DATE [IMAGE_TYPE]' >&2
+	exit 1
+fi
+
+DATE="$1"
+IMAGE_TYPE="${2:-livecd-base}"
+
+LIVE="$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/live"
+
+PUBLISH="$CDIMAGE_ROOT/www/full/$IMAGE_TYPE/$DATE"
+
+for arch in $CPUARCHES; do
+	if [ -e "$LIVE/$arch.cloop" ]; then
+		fs=cloop
+	elif [ -e "$LIVE/$arch.squashfs" ]; then
+		fs=squashfs
+	else
+		fs=
+	fi
+	if [ "$fs" ]; then
+		echo "Publishing $arch ($fs) ..."
+		mkdir -p "$PUBLISH"
+		cp -a "$LIVE/$arch.$fs" "$PUBLISH/$arch.$fs"
+		if [ -e "$LIVE/$arch.kernel" ]; then
+			cp -a "$LIVE/$arch.kernel" "$PUBLISH/$arch.kernel"
+		fi
+		if [ -e "$LIVE/$arch.initrd" ]; then
+			cp -a "$LIVE/$arch.initrd" "$PUBLISH/$arch.initrd"
+		fi
+		cp -a "$LIVE/$arch.manifest" "$PUBLISH/$arch.manifest"
+		if [ -e "$LIVE/$arch.manifest-remove" ]; then
+			cp -a "$LIVE/$arch.manifest-remove" "$PUBLISH/$arch.manifest-remove"
+		elif [ -e "$LIVE/$arch.manifest-desktop" ]; then
+			cp -a "$LIVE/$arch.manifest-desktop" "$PUBLISH/$arch.manifest-desktop"
+		fi
+	else
+		echo "No filesystem for $arch!" >&2
+	fi
+done
+
+if [ -d "$PUBLISH" ]; then
+	(cd "$PUBLISH" && \
+		find \( -name \*.cloop -o -name \*.squashfs \) \
+		     -printf '%P\n' | xargs md5sum -b > MD5SUMS)
+	(cd "$PUBLISH" && \
+		find \( -name \*.cloop -o -name \*.squashfs \) \
+		     -printf '%P\n' | xargs sha1sum -b > SHA1SUMS)
+	(cd "$PUBLISH" && \
+		find \( -name \*.cloop -o -name \*.squashfs \) \
+		     -printf '%P\n' | xargs sha256sum -b > SHA256SUMS)
+	sign-cdimage "$PUBLISH/MD5SUMS"
+	sign-cdimage "$PUBLISH/SHA1SUMS"
+	sign-cdimage "$PUBLISH/SHA256SUMS"
+	ln -nsf "$DATE" "$CDIMAGE_ROOT/www/full/$IMAGE_TYPE/current"
+else
+	echo "No cloops produced!" >&2
+fi

@@ -1,0 +1,49 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+TRACKER=http://torrent.ubuntu.com:6969/announce
+IP6TRACKER=http://ipv6.torrent.ubuntu.com:6969/announce
+
+if [ -z "$1" ]; then
+	echo 'Usage: make-torrents DIRECTORY CDPREFIX [TARGET_HOSTNAME]' >&2
+	echo 'TARGET_HOSTNAME is used in the metafile comment; it defaults' >&2
+	echo 'to cdimage.ubuntu.com.' >&2
+	exit 1
+fi
+DIRECTORY="$1"
+# $2 may be empty
+CDPREFIX="$2"
+if [ "$3" ]; then
+	TARGET_HOSTNAME="$3"
+else
+	TARGET_HOSTNAME=cdimage.ubuntu.com
+fi
+
+make_torrent () {
+	image="$1"
+	[ -f "$image" ] || return 0
+	echo "Creating torrent for $image ..."
+	rm -f "$image.torrent"
+	if [ "$TARGET_HOSTNAME" = releases.ubuntu.com ]; then
+		# NB: Only the bittornado version of btmakemetafile has the
+		# --announce_list flag.
+		btmakemetafile "$TRACKER" \
+			--announce_list "$TRACKER|$IP6TRACKER" \
+			--comment "$CAPPROJECT CD $TARGET_HOSTNAME" \
+			"$image" >/dev/null
+	else
+		btmakemetafile "$TRACKER" \
+			--comment "$CAPPROJECT CD $TARGET_HOSTNAME" \
+			"$image" >/dev/null
+	fi
+}
+
+if [ "$CDPREFIX" ]; then
+	for image in "$DIRECTORY/$CDPREFIX"-*.iso; do
+		make_torrent "$image"
+	done
+fi
+make_torrent "$DIRECTORY/$CDPREFIX.iso"

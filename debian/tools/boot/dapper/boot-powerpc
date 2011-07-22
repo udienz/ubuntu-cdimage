@@ -1,0 +1,207 @@
+#!/bin/bash
+#
+# Do install stuff for powerpc, including making bootable CDs
+# Works with debian-installer
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+
+. $BASEDIR/tools/boot/$DI_CODENAME/common.sh
+
+set -e
+
+N=$1
+CDDIR=$2
+INSTALLDIR=$CDDIR/install
+if [ "$DI_WWW_HOME" = "default" ];then
+   DI_WWW_HOME="http://people.debian.org/~luther/d-i/images/daily"
+fi
+if [ ! "$DI_DIST" ]; then
+   export DI_DIST="$DI_CODENAME"
+fi
+if [ -z "$DI_PATH" ]; then
+   DI_PATH="$($BASEDIR/tools/find-newest-installer)"
+fi
+
+default_preseed
+
+cd $CDDIR/..
+
+# Only disk 1* bootable
+if [ $N != 1 -a $N != 1_NONUS ]; then
+    # we don't need HFS cruft on anything but CD 1
+	:> $N.mkisofs_opts
+	exit 0
+fi
+
+install_languages $CDDIR
+
+echo -n "--netatalk -hfs -probe -map $BASEDIR/data/hfs.map" \
+        > $N.mkisofs_opts
+# We are still missing this for prep
+#echo -n " -prep-boot install/powerpc/vmlinuz-prep.initrd" >> $N.mkisofs_opts
+echo -n " -chrp-boot -iso-level 2" >> $N.mkisofs_opts
+# For newworld Mac booting  - Note, no spaces in volid!
+echo -n " -part -no-desktop -hfs-bless CD$N/install -hfs-volid ${CAPPROJECT}_PowerPC_${CODENAME} " \
+	>> $N.mkisofs_opts
+# Recommended size for a HFS Catalog is 4 megas per giga, defaults to 4 megas
+if [ "$CDIMAGE_DVD" = 1 ]; then
+  if [ -n "$SIZELIMIT1" ];then
+    if [ "$SIZELIMIT1" -gt 1000000000 ];then
+      let newsize="$SIZELIMIT1"/256
+      echo -n " -hfs-parms MAX_XTCSIZE=$newsize" >> $N.mkisofs_opts
+    fi
+  else
+    if [ -n "$SIZELIMIT" ];then
+      if [ "$SIZELIMIT" -gt 1000000000 ];then
+        let newsize="$SIZELIMIT"/256
+        echo -n " -hfs-parms MAX_XTCSIZE=$newsize" >> $N.mkisofs_opts
+      fi
+    else
+      if [ -n "$DEFBINSIZE" ] && [ "$DEFBINSIZE" -gt 1000 ];then
+        let newsize="$DEFBINSIZE"*4096
+        echo -n " -hfs-parms MAX_XTCSIZE=$newsize" >> $N.mkisofs_opts
+      fi
+    fi
+  fi
+fi
+
+"$BASEDIR/tools/sorting_weights" "$N"
+echo -n " -sort $(pwd)/$N.weights " >> $N.mkisofs_opts
+
+cd $INSTALLDIR
+# Extract yaboot from the archive
+if [ -z "$YABOOT_DEBUG" ]; then
+    YADEB="$($BASEDIR/tools/apt-selection cache show yaboot | \
+	   grep ^Filename | awk '{print $2}')"
+    (ar p "${MIRROR}/${YADEB}" data.tar.gz | \
+	tar zxf - -C . ./usr/lib/yaboot/yaboot)
+    mv usr/lib/yaboot/yaboot .
+    rm -rf usr
+else
+ cp -f $YABOOT_DEBUG yaboot
+fi
+
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    timeout='timeout=300'
+else
+    timeout=
+fi
+
+#
+# generate/download images for "powerpc"
+# (missing: bootvars1.3b.sit.hqx, BootX_1.2.2.sit, boot-floppy-hfs.img)
+BUILD_DATE="${CDIMAGE_DATE:-$(date +%Y%m%d)}"
+(if [ "$CDIMAGE_DVD" = 1 ] && [ "$CDIMAGE_LIVE" = 1 ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/boot.msg.dvd
+ elif [ "$CDIMAGE_INSTALL" = 1 ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/boot.msg.install
+ elif [ "$CDIMAGE_LIVE" = 1 ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/boot.msg.live
+ fi) \
+ | sed "s/\${MEDIA_TYPE}/CDROM/" \
+ | sed "s/\${DEBIAN_VERSION}/${DEBVERSION}/g" \
+ | sed "s/\${CODENAME}/${CAPCODENAME}/g" \
+ | sed "s/\${BUILD_DATE}/${BUILD_DATE}/g" \
+ | sed "s#Ubuntu#$CAPPROJECT#g" \
+ > boot.msg
+(if [ "$CDIMAGE_LIVE" = 1 ]; then
+     sed 's/\${DEFAULT}/live/g' $BASEDIR/data/$CODENAME/yaboot/yaboot.conf
+ else
+     sed 's/\${DEFAULT}/install/g' $BASEDIR/data/$CODENAME/yaboot/yaboot.conf
+ fi
+ if [ "$CDIMAGE_LIVE" = 1 ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.live
+ fi
+ if [ "$CDIMAGE_INSTALL" = 1 ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.install
+     if [ "$PROJECT" = edubuntu ]; then
+         cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.workstation
+     fi
+     if [ "$PROJECT" != kubuntu ] && [ "$PROJECT" != edubuntu ] && [ "$PROJECT" != ubuntu-server ]; then
+         cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.oem
+     fi
+     if [ "$PROJECT" = ubuntu-server ]; then
+         cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.lamp
+     fi
+ fi
+ if [ "$CDIMAGE_INSTALL_BASE" = 1 ] && [ "$PROJECT" != edubuntu ] && [ "$PROJECT" != ubuntu-server ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.server
+ fi
+ if [ "$CDIMAGE_INSTALL" = 1 ] && [ "$PROJECT" = xubuntu ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.ltsp
+ fi
+ if [ "$CDIMAGE_LIVE" = 1 ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.check-live
+ elif [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+     cat $BASEDIR/data/$CODENAME/yaboot/yaboot.conf.check
+ fi) \
+ | sed "s/CODENAME/${CODENAME}/g" \
+ | sed "s,\${DEFAULT_PRESEED},${DEFAULT_PRESEED},g" \
+ | sed "s,\${LAMP_PRESEED},${LAMP_PRESEED},g" \
+ | sed "s,\${TIMEOUT},${timeout},g" \
+ > yaboot.conf
+cp $BASEDIR/data/$CODENAME/yaboot/ofboot.b ofboot.b
+
+# for CHRP systems
+mkdir "$CDDIR/etc"
+cp -a "$CDDIR/install/yaboot.conf" "$CDDIR/etc/yaboot.conf"
+mkdir "$CDDIR/ppc"
+< $BASEDIR/data/$CODENAME/yaboot/bootinfo.txt \
+    sed "s/\${CAPPROJECT}/$CAPPROJECT/g" \
+  | sed "s/\${CODENAME}/$CODENAME/g" \
+  > "$CDDIR/ppc/bootinfo.txt"
+
+if [ ! "$DI_WWW_HOME" ]; then
+  cp -a "$DI_PATH/current/images/udeb.list" .
+else
+  wget "$DI_WWW_HOME/udeb.list"
+fi
+
+for subarch in powerpc powerpc64
+do
+  cdrom="cdrom${subarch#powerpc}"
+  if [ ! "$DI_WWW_HOME" ];then
+	DI_DIR="$DI_PATH/current/images/$subarch/$cdrom"
+  else
+	DI_DIR="di_stuff"
+	for image in initrd.gz vmlinux; do
+		dir="$(dirname "$image")"
+		mkdir -p "$DI_DIR/$dir"
+		wget "$DI_WWW_HOME/$subarch/$cdrom/$image" -O "$DI_DIR/$image"
+	done
+  fi
+  if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+    cp -a "$DI_DIR" "$subarch"
+    rm -rf di_stuff
+    # Remove special initrds we don't want. OldWorld isn't supported due to
+    # the lack of boot support, and space restrictions are too tight to
+    # support PReP.
+    rm -f "$subarch/vmlinuz-coff.initrd"
+    rm -f "$subarch/vmlinuz-prep.initrd" "$subarch/vmlinuz-ppcbug.initrd"
+  fi
+  if [ "$CDIMAGE_LIVE" = 1 ]; then
+    case $subarch in
+      powerpc)
+        casper_subarch=powerpc
+        ;;
+      powerpc64)
+        casper_subarch=powerpc64-smp
+        ;;
+    esac
+    mkdir -p "$CDDIR/casper/$subarch"
+    mv "$CDDIR/casper/filesystem.kernel-$casper_subarch" \
+       "$CDDIR/casper/$subarch/vmlinux"
+    mv "$CDDIR/casper/filesystem.initrd-$casper_subarch" \
+       "$CDDIR/casper/$subarch/initrd.gz"
+  fi
+done
+
+# Copy pegasos forth script, since pegasos machines don't support yaboot yet.
+cat $BASEDIR/data/$DI_CODENAME/pegasos/pegasos \
+ | sed "s/\${MEDIA_TYPE}/CDROM/" \
+ | sed "s/\${DEBIAN_VERSION}/${CODENAME}/g" \
+ | sed "s/\${BUILD_DATE}/${BUILD_DATE}/g" \
+ > pegasos
+
+exit 0

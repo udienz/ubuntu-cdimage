@@ -1,0 +1,6 @@
+# Only show Ubuntu Studio tasks.
+tasksel	tasksel/limit-tasks	string minimal, standard, ubuntustudio-generation, ubuntustudio-recording, ubuntustudio-audio-plugins, ubuntustudio-desktop, ubuntustudio-graphics, ubuntustudio-video
+# Add the initial user to the audio group as well as the usual ones, since
+# realtime audio for jack is not PolicyKit aware yet, and users cannot run
+# jack with realtime priority without being in this group.
+d-i	passwd/user-default-groups	string adm audio cdrom dialout lpadmin plugdev sambashare

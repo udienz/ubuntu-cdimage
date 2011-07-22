@@ -1,0 +1,8 @@
+d-i	passwd/user-fullname	string Ubuntu MID User
+d-i	passwd/username	string ubuntu
+d-i	user-setup/allow-password-empty	boolean true
+d-i	passwd/user-password	password
+d-i	passwd/user-password-again	password
+d-i	netcfg/get_hostname	string ubuntu
+d-i	console-setup/layoutcode	string us
+d-i	user-setup/encrypt-home	boolean false

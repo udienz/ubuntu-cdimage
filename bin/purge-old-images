@@ -1,0 +1,81 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ]; then
+	echo 'Usage: purge-old-images IMAGE_TYPE [DAYS]' >&2
+	exit 1
+fi
+IMAGE_TYPE="$1"
+IMAGE_TYPE_DIR="$(echo "$IMAGE_TYPE" | sed 's,_,/,g')"
+
+get_purge_days () {
+	while read imagetype days; do
+		if [ "$imagetype" = "$1" ]; then
+			echo "$days"
+			return 0
+		fi
+	done < "$CDIMAGE_ROOT/etc/purge-days"
+	return 1
+}
+
+if [ "$2" ]; then
+	DAYS="$2"
+else
+	DAYS="$(get_purge_days "$PROJECT/$IMAGE_TYPE")" || \
+	DAYS="$(get_purge_days "$IMAGE_TYPE")" || {
+		echo "No purge time configured for $IMAGE_TYPE"
+		exit 0
+	}
+fi
+if [ "$DAYS" = 0 ]; then
+	echo "Not purging images for $PROJECT/$IMAGE_TYPE"
+	exit 0
+fi
+echo "Purging $PROJECT/$IMAGE_TYPE images older than $DAYS days ..."
+
+OLDEST="$(date -d "$DAYS days ago" +%Y%m%d)"
+
+case $PROJECT in
+	ubuntu|livecd-base)
+		FULL_TREE=full
+		;;
+	*)
+		FULL_TREE="full/$PROJECT"
+		;;
+esac
+
+if dist_le lucid; then
+	FULL_TREE="$FULL_TREE/$DIST"
+fi
+
+if ! cd "$CDIMAGE_ROOT/www/$FULL_TREE/$IMAGE_TYPE_DIR"; then
+	echo "No old images to purge"
+	exit 0
+fi
+
+for dir in *; do
+	# Directory?
+	if [ ! -d "$dir" ]; then
+		continue
+	fi
+
+	# Numeric directory?
+	if ! echo "$dir" | grep -q '^[0-9]'; then
+		continue
+	fi
+
+	# Older than cut-off date?
+	if [ "$OLDEST" = "$dir" ] || [ "$OLDEST" '<' "$dir" ]; then
+		continue
+	fi
+
+	if [ "$DEBUG" ]; then
+		echo "Would purge $IMAGE_TYPE_DIR/$dir"
+	else
+		echo "Purging $IMAGE_TYPE_DIR/$dir"
+		rm -rf "$dir"
+	fi
+done

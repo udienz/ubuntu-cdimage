@@ -1,0 +1,5 @@
+debhelper/*.1
+debian/files
+debian/germinate
+debian/*.debhelper*
+debian/*.substvars

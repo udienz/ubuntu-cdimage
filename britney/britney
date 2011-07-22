@@ -1,0 +1,154 @@
+#!/bin/bash
+
+export PYTHONPATH=/org/ftp.debian.org/katie
+
+set -e
+
+ulimit -d 900000 -m 900000 -v 900000
+umask 002
+
+OPTIONS="$@"
+option () {
+    for a in $OPTIONS; do if [ "$a" = "$1" ]; then date; return 0; fi; done
+    return 1
+}
+
+# Dirs:
+OUT=/org/ftp.debian.org/testing/data/testing
+TPU=/org/ftp.debian.org/testing/data/testing-proposed-updates
+STABLE=/org/ftp.debian.org/testing/data/stable
+UNSTABLE=/org/ftp.debian.org/testing/data/unstable
+HTML=/org/ftp.debian.org/web/testing
+
+SCRIPTS=/org/ftp.debian.org/testing/update_out
+
+# First, update the .list files
+if option regen; then
+  echo JENNA UNSTABLE:
+  cd /org/ftp.debian.org/katie
+  ./jenna --suite=unstable
+fi
+
+# First, update the .list files
+if option commitjen; then
+  echo JENNA TESTING:
+  cd /org/ftp.debian.org/katie
+  ./jenna --suite=testing
+fi
+
+if option urgencies; then
+  echo URGENCIES:
+  cd /org/ftp.debian.org/testing
+  for u in urgencies/install-urgencies-*; do
+    [ -e "$u" ] || continue
+    cat "$u" >> data/testing/Urgency
+    rm "$u"
+  done
+fi
+
+if option aptftp; then 
+  cd /org/ftp.debian.org/testing
+  echo APT:
+  apt-ftparchive -o APT::FTPArchive::Contents=off --readonly \
+        generate get_testing.conf 
+fi
+
+if option nonus; then
+  echo NON-US:
+  cd /org/ftp.debian.org/testing
+  ./get-non-US.sh
+  cat data/non-US-urgencies >>data/testing/Urgency
+  rm -f data/non-US-urgencies
+fi
+
+if option nonussections; then
+  echo NON-US-SEC:
+  cd /org/ftp.debian.org/testing/data
+  for a in *_non-US_*; do
+    (cd $a;
+     for b in Packages_* Sources; do
+       perl -n -i -e 'if (m/^$/) { print $para; print "Section: non-US\n" unless($s); print "\n"; $para = ""; $s = 0; next; } if (m/^Section:/) { $s = 1; } $para .= $_;' $b
+     done
+    )
+  done
+fi
+
+if option merge; then
+  echo MERGE:
+  cd /org/ftp.debian.org/testing/data
+  for a in stable testing testing-proposed-updates unstable; do
+    for b in $(cd ${a}_main; echo *); do
+     cat ${a}_*/$b > ${a}/$b
+    done
+  done
+fi
+
+if option bugs; then
+  echo BUGS:
+  cd /org/ftp.debian.org/testing
+  wget --quiet -O $UNSTABLE/Bugs.new http://master.debian.org./~ajt/impbugs.txt
+  if [ -s $UNSTABLE/Bugs.new ]; then mv $UNSTABLE/Bugs.new $UNSTABLE/Bugs;
+  else rm $UNSTABLE/Bugs.new; exit 1; fi
+fi
+
+if option updateout; then
+  echo UPDATE_OUT:
+  cd $SCRIPTS
+  ./update_out.py $OUT $UNSTABLE $TPU
+fi
+
+if option save; then
+  cd /org/ftp.debian.org/testing
+  echo RESULTS:
+  (grep -vi ' non-us[^ ]*$' $OUT/HeidiResult | cut -d\  -f1-3 | sort -u;
+  cat $OUT/HeidiDI) | 
+    (cd /org/ftp.debian.org/katie; ./heidi --set testing)
+fi
+
+if option savenonus; then
+  cd /org/ftp.debian.org/testing
+  echo RESULTS:
+  grep -i ' non-us[^ ]*$' $OUT/HeidiResult | cut -d\  -f1-3 | sort -u | 
+    (unset SSH_AUTH_SOCK SSH_CLIENT SSH_TTY || true;
+     ssh -1 -v -a -x -e none -q -i pandora/heidi-identity ajt@non-us)
+fi
+
+if option stats; then
+  echo STATS:
+  cp $SCRIPTS/update.EXCUSES_py $HTML/update_excuses.html
+  cp $SCRIPTS/update.OUTPUT_py $HTML/update_output.txt
+  gzip -9 < $HTML/update_excuses.html > $HTML/update_excuses.html.gz
+  gzip -9 < $HTML/update_output.txt > $HTML/update_output.txt.gz
+
+  cd /org/ftp.debian.org/testing
+  ./rptprobs.sh $OUT $HTML/testing_probs.html testing
+  ./rptprobs.sh $STABLE $HTML/stable_probs.html stable
+  ./rptprobs.sh $UNSTABLE $HTML/unstable_probs.html unstable
+
+  cd $SCRIPTS
+  ./check_uptodate.py $OUT >$HTML/testing_outdate.txt
+  ./check_uptodate.py $STABLE >$HTML/stable_outdate.txt
+  ./check_uptodate.py $UNSTABLE >$HTML/unstable_outdate.txt
+fi
+
+if option summary; then
+  cd /org/ftp.debian.org/testing
+  echo "Out of dates holding up testing:"
+  TERM=vt100 lynx -nolist -dump $HTML/update_excuses.html | sed -n 's/^ *[^ ] *[^ ]*out of date on \([^ ]*\): .*$/\1/p' | sort | uniq -c | sort -n
+  echo "Uninstallables holding up testing:"
+  sed < $HTML/update_excuses.html -n 's/^ *<li>[^ ]* (\([^, ]*\),.*) uninstallable.*$/\1/p' | sort | uniq -c | sort -n
+  echo "wanna-build stats:"
+  for a in alpha arm hppa hurd-i386 i386 ia64 m68k mips mipsel powerpc s390 sparc; do
+    printf "  %-12s " "$a:"
+    /org/wanna-build/bin/wanna-build-statistics --database=$a/build-db | 
+      grep "if also counting" || echo "-"
+  done
+fi
+
+if option archivedata; then
+  echo ARCHIVE:
+  cd /org/ftp.debian.org/testing
+  tar czf data_bkup/data-$(date +"%Y.%m.%d").tgz data/{stable,testing,unstable,testing-proposed-updates}
+fi
+
+echo -n "Finished at: "; date

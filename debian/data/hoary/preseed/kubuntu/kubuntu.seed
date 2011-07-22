@@ -1,0 +1,7 @@
+# Adjust task names for Kubuntu.
+d-i	archive-copier/desktop-task	string kubuntu-desktop
+d-i	archive-copier/ship-task	string kubuntu-ship
+# Install the Kubuntu desktop.
+base-config	base-config/package-selection	string ~tkubuntu-desktop
+# Install KDE translation packages.
+base-config	base-config/language-pack-patterns	string language-pack-$LL kde-i18n-$LL

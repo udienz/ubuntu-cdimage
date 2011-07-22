@@ -1,0 +1,29 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+BRITNEY="${BRITNEY:-$CDIMAGE_ROOT/britney}"
+
+IMAGETOP="${IMAGETOP:-$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/tmp}"
+
+mkemptydir "$BRITNEY/data/$PROJECT/$IMAGE_TYPE/$DIST"
+for fullarch in $ARCHES; do
+	arch="${fullarch%%+*}"
+	for component in main restricted universe multiverse; do
+		packages="$IMAGETOP/$DIST-$fullarch/CD1/dists/$DIST/$component/binary-$arch/Packages.gz"
+		if [ -e "$packages" ]; then
+			zcat "$packages" >> "$BRITNEY/data/$PROJECT/$IMAGE_TYPE/$DIST/Packages_$arch"
+		fi
+	done
+	if [ ! -e "$BRITNEY/data/$PROJECT/$IMAGE_TYPE/$DIST/Packages_$arch" ]; then
+		echo "No Packages.gz for $DIST/$arch; not checking" >&2
+	fi
+done
+> "$BRITNEY/data/$PROJECT/$IMAGE_TYPE/$DIST/Sources"
+
+mkemptydir "$BRITNEY/report/$PROJECT/$IMAGE_TYPE"
+# Sometimes this inexplicably hangs on a futex. We'll give it thirty seconds
+# and then kill it.
+kill-after 30 "$BRITNEY/rptprobs.sh" "$BRITNEY/data/$PROJECT/$IMAGE_TYPE/$DIST" "$BRITNEY/report/$PROJECT/$IMAGE_TYPE/${DIST}_probs.html" "$CAPPROJECT $DIST" || true

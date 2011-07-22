@@ -1,0 +1,30 @@
+#! /usr/bin/perl -w
+
+use strict;
+
+my $dir = shift;
+
+if (! -d $dir) { 
+	die "$dir is not a directory ..."; 
+}
+
+open (MD5SUM, "$dir/md5sum.txt") || die "Can't open $dir/md5sum.txt: $!\n";
+my @md5sums = sort <MD5SUM>;
+close MD5SUM;
+
+my $prev_md5 = '';
+my $prev_file = '';
+foreach (@md5sums) {
+	chomp;
+	my ($md5, $file) = split;
+	if ($md5 eq $prev_md5 and
+	    not -l "$dir/$prev_file" and not -l "$dir/$file" and
+	    (stat "$dir/$prev_file")[1] != (stat "$dir/$file")[1]) {
+		print "Linking $dir/$prev_file to $dir/$file\n";
+		unlink ("$dir/$file") || die "Can't unlink $dir/$file: $!\n";
+		link ("$dir/$prev_file", "$dir/$file")
+		    || die "Can't link $dir/$prev_file to $dir/$file: $!\n";
+	}
+	$prev_md5 = $md5;
+	$prev_file = $file;
+}

@@ -1,0 +1,74 @@
+#! /bin/sh
+set -e
+
+unset http_proxy
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+IMAGE_TYPE=wubi
+ARCHES="i386 amd64"
+PATH="$CDIMAGE_ROOT/bin${PATH:+:$PATH}"
+LIVE_OUT="$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE"
+
+if ! lockfile -l 7200 -r 0 "$CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE"; then
+	echo "Another image set is already building!" >&2
+	exit 1
+fi
+trap "code=\$?; rm -f $CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE; exit \$code" EXIT HUP INT QUIT TERM
+
+export DATE="$(next-build-date "$IMAGE_TYPE")"
+mkemptydir "$LIVE_OUT"
+
+GOT_IMAGE=0
+for arch in $ARCHES; do
+	if fetch "$(find-live-filesystem "$arch" tar.xz)" \
+		"$LIVE_OUT/$arch.tar.xz"; then
+			GOT_IMAGE=1
+	fi
+	fetch "$(find-live-filesystem "$arch" manifest)" \
+		"$LIVE_OUT/$arch.manifest" || true
+
+done
+
+if [ "$GOT_IMAGE" = 0 ]; then
+	echo "No filesystem images found." >&2
+	exit 1
+fi
+
+
+case $PROJECT in
+	ubuntu)
+		PUBLISH_ROOT="$CDIMAGE_ROOT/www/full/$IMAGE_TYPE"
+		PUBLISH="$PUBLISH_ROOT/$DATE"
+		;;
+	*)
+		PUBLISH_ROOT="$CDIMAGE_ROOT/www/full/$PROJECT/$IMAGE_TYPE"
+		PUBLISH="$PUBLISH_ROOT/$DATE"
+		;;
+esac
+
+mkdir -p "$PUBLISH"
+
+for arch in $ARCHES; do
+	echo "Publishing $IMAGE_TYPE $arch ..."
+	cp -a "$LIVE_OUT/$arch.tar.xz" "$PUBLISH/${STEM}${arch}.tar.xz"
+	cp -a "$LIVE_OUT/$arch.manifest" "$PUBLISH/${STEM}${arch}.manifest"
+
+done
+
+(cd "$PUBLISH" && \
+	find \( -name \*.tar.xz -o -name \*.manifest \) -printf '%P\n' \
+	| xargs md5sum -b > MD5SUMS)
+(cd "$PUBLISH" && \
+	find \( -name \*.tar.xz -o -name \*.manifest \) -printf '%P\n' \
+	| xargs sha1sum -b > SHA1SUMS)
+(cd "$PUBLISH" && \
+	find \( -name \*.tar.xz -o -name \*.manifest \) -printf '%P\n' \
+	| xargs sha256sum -b > SHA256SUMS)
+sign-cdimage "$PUBLISH/MD5SUMS"
+sign-cdimage "$PUBLISH/SHA1SUMS"
+sign-cdimage "$PUBLISH/SHA256SUMS"
+
+ln -nsf "$DATE" "$PUBLISH_ROOT/current"
+purge-old-images "$IMAGE_TYPE"
+sync-mirrors

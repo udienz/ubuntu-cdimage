@@ -1,0 +1,80 @@
+#!/bin/sh
+
+set -e
+
+# simple script to run anonftpsync repeatedly, at 5min intervals, until the
+# requested package/version is available.
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+
+FTPDIR=ftp
+ANONFTPSYNC_CONF=$CDIMAGE_ROOT/etc/anonftpsync
+export ANONFTPSYNC_CONF
+
+ARCH=i386
+COMPONENT=main
+DIST=lucid
+
+while [ $# -gt 0 ]; do
+	case $1 in
+		-a)
+			ARCH="$2"
+			shift 2
+			;;
+		-c)
+			COMPONENT="$2"
+			shift 2
+			;;
+		-d)
+			DIST="$2"
+			shift 2
+			;;
+		*)
+			PACKAGE=$1
+			shift
+			;;
+	esac
+done
+
+if [ -z "$PACKAGE" ]; then
+	echo "No package specified."
+	exit 1
+fi
+if [ "$PACKAGE" = "${PACKAGE%%_*}" ]; then
+	echo "Package must be specified as <package>_<version>"
+	exit 1
+fi
+
+case $COMPONENT in
+	universe|multiverse)
+		EXTN=universe
+		;;
+esac
+
+case $ARCH in
+	amd64|i386|source)
+		;;
+	*)
+		EXTN="$EXTN${EXTN+-}ports"
+		;;
+esac
+
+if [ -n "$EXTN" ]; then
+	FTPDIR="$FTPDIR-$EXTN"
+	ANONFTPSYNC_CONF="$ANONFTPSYNC_CONF.$EXTN"
+fi
+
+if [ "$ARCH" = "source" ]; then
+	TARGET="$CDIMAGE_ROOT/$FTPDIR/dists/$DIST/$COMPONENT/source/Sources.gz"
+else
+	TARGET="$CDIMAGE_ROOT/$FTPDIR/dists/$DIST/$COMPONENT/binary-$ARCH/Packages.gz"
+fi
+
+echo -n "Waiting for $PACKAGE."
+anonftpsync
+while ! zgrep -q "$PACKAGE" "$TARGET"; do
+	echo -n "."
+	sleep 300
+	anonftpsync
+done
+echo " package found."

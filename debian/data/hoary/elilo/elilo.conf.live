@@ -1,0 +1,88 @@
+chooser=textmenu
+default=Live
+delay=20
+prompt
+
+message=/efi/boot/elilo_menu.msg
+f1=/efi/boot/general.msg
+f2=/efi/boot/params.msg
+
+image=/linux
+    label=Live
+    description="Linux 2.6 [VGA] [Live]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop ramdisk_size=1048576 --"
+    read-only
+
+image=/linux
+    label=LiveExpert
+    description="Linux 2.6 [VGA] [Live] [Expert mode]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop DEBCONF_PRIORITY=low ramdisk_size=1048576 --"
+    read-only
+
+image=/linux
+    label=LiveSerial9600Text
+    description="Linux 2.6 [9600 baud serial console] [Live] [Text frontend]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop ramdisk_size=1048576 console=ttyS0,9600n8 DEBIAN_FRONTEND=text --"
+    read-only
+
+image=/linux
+    label=LiveSerial9600
+    description="Linux 2.6 [9600 baud serial console] [Live]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop ramdisk_size=1048576 console=ttyS0,9600n8 --"
+    read-only
+
+image=/linux
+    label=LiveExpertSerial9600Text
+    description="Linux 2.6 [9600 baud serial console] [Live] [Expert mode] [Text frontend]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop DEBCONF_PRIORITY=low ramdisk_size=1048576 console=ttyS0,9600n8 DEBIAN_FRONTEND=text --"
+    read-only
+
+image=/linux
+    label=LiveExpertSerial9600
+    description="Linux 2.6 [9600 baud serial console] [Live] [Expert mode]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop DEBCONF_PRIORITY=low ramdisk_size=1048576 console=ttyS0,9600n8 --"
+    read-only
+
+image=/linux
+    label=LiveSerial38400
+    description="Linux 2.6 [38400 baud serial console] [Live]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop ramdisk_size=1048576 console=ttyS0,38400n8 --"
+    read-only
+
+image=/linux
+    label=LiveExpertSerial38400
+    description="Linux 2.6 [38400 baud serial console] [Live] [Expert mode]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop DEBCONF_PRIORITY=low ramdisk_size=1048576 console=ttyS0,38400n8 --"
+    read-only
+
+image=/linux
+    label=LiveSerial115200
+    description="Linux 2.6 [115200 baud serial console] [Live]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop ramdisk_size=1048576 console=ttyS0,115200n8 --"
+    read-only
+
+image=/linux
+    label=LiveExpertSerial115200
+    description="Linux 2.6 [115200 baud serial console] [Live] [Expert mode]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop DEBCONF_PRIORITY=low ramdisk_size=1048576 console=ttyS0,115200n8 --"
+    read-only

@@ -1,0 +1,320 @@
+.Dd May 27, 2005
+.Os Ubuntu
+.ds volume-operating-system Ubuntu
+.Dt GERMINATE 1
+.Sh NAME
+.Nm germinate
+.Nd expand dependencies in a list of seed packages
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Op Fl S Ar source
+.Op Fl s Ar dist
+.Op Fl m Ar mirror
+.Op Fl d Ar dist Ns \&,...
+.Op Fl a Ar arch
+.Op Fl c Ar component Ns \&,...
+.Op Fl i
+.Op Fl Fl bzr
+.Op Fl Fl no\-rdepends
+.Sh DESCRIPTION
+.Nm
+is a program to help with the maintenance of large software distributions.
+It takes a list of seed packages and a mirror of the distribution, and
+produces outputs with the seed packages and their dependencies and
+build-dependencies expanded out in full.
+.Ss Seeds
+The contents of the Ubuntu distribution, and others, are managed by means of
+.Em seeds .
+At their simplest, these are lists of packages which are considered
+important to have in the main component of the distribution, without
+explicitly listing all their dependencies and build-dependencies.
+.Pp
+Seed lists are typically divided up by category: a
+.Li base
+or
+.Li minimal
+seed might list the core set of packages required to make the system run at
+all, while a
+.Li desktop
+seed might list the set of packages installed as part of a default desktop
+installation.
+.Nm
+takes these seeds, adds their dependency trees, and produces an
+.Em output
+for each seed which contains a dependency-expanded list of package names.
+These outputs may be handed on to archive maintenance or CD-building tools.
+.Pp
+Some seeds may
+.Em inherit
+from other seeds: they rely on those seeds to be installed.
+For example, a
+.Li desktop
+seed will typically inherit from a
+.Li minimal
+seed.
+.Nm
+understands these inheritance relationships.
+If a package in the
+.Li desktop
+seed depends on
+.Sq foo ,
+but
+.Sq foo
+is already part of the
+.Li minimal
+seed or dependency list, then
+.Sq foo
+will not be added to the
+.Li desktop
+output.
+.Pp
+Seeds are stored in text files downloaded from a given URL.
+Lines not beginning with
+.Sq "\ *\ "
+(wiki-style list markup) are ignored.
+.Pp
+Seed entries may simply consist of a package name, or may include any of the
+following special syntax:
+.Bl -tag -width 6n
+.It %
+Seed entries beginning with
+.Sq %
+expand to all binaries from the given source package.
+.It [...]
+Seed entries may be followed with
+.Sq " [" Ns Ar arch1 Ar arch2 ... Ns \&]
+to indicate that they should only be used on the given architectures, or with
+.Sq " [!" Ns Ar arch1 No ! Ns Ar arch2 ... Ns \&]
+to indicate that they should not be used on the given architectures.
+.It (...)
+Seed entries in parentheses indicate that the seed should be treated as a
+recommendation of metapackages generated from this seed, rather than as a
+dependency.
+.It !
+Seed entries beginning with
+.Sq \&!
+cause the given package to be blacklisted from the given seed and any seeds
+from which it inherits; this may be followed by
+.Sq %
+as above to blacklist all binaries from the given source package.
+Note that this may result in uninstallable packages whose dependencies have
+been blacklisted, so use this feature sparingly.
+The purpose of a blacklist is to make it obvious when a package that is not
+supposed to be installed ends up in
+.Nm Ns 's
+output, so that package relationships can be fixed to stop that happening.
+It is not intended for the purpose of working around buggy package
+relationships, and attempts to do so will not work because
+.Ic apt
+has no way to know about blacklist entries in seeds.
+.It key: value
+Some seeds also contain headers at the top of the file, in
+.Dq key: value
+format.
+For the most part, these are not parsed by
+.Nm
+itself.
+The Ubuntu
+.Ic tasksel
+package uses keys beginning with
+.Sq Task\-
+to define fields of similar names in its
+.Pa .desc
+files.
+.Xr germinate\-update\-metapackage 1
+uses some of these headers to reduce the need for fragile configuration;
+see its documentation for further details.
+.El
+.Pp
+A
+.Pa STRUCTURE
+file alongside the seeds lists their inheritance relationships.
+It may also include lines beginning with
+.Sq include ,
+causing other collections of seeds to be included as if they were part of
+the collection currently being germinated, or lines beginning with
+.Sq feature ,
+which set flags for the processing of seeds.
+The only flag currently defined is
+.Sq follow\-recommends ,
+which causes
+.Nm
+to treat Recommends fields as if they were Depends.
+(Features may also be set on a per-seed basis using lines beginning with
+.Sq "\ *\ Feature:"
+in the seed file; here,
+.Sq no\-follow\-recommends
+is also supported to allow Recommends-following to be turned off for
+individual seeds.)
+.Ss Build-dependencies and Sq supported
+There is typically no need for a default desktop installation to contain all
+the compilers and development libraries needed to build itself from source;
+if nothing else, it would consume much more space.
+Nevertheless, it is normally a requirement for the maintainers of a
+distribution to support all the packages necessary to build that
+distribution.
+.Pp
+.Nm
+therefore does not add all the packages that result from following
+build-dependencies of seed packages and of their dependencies (the
+.Dq build-dependency tree )
+to every output, unless they are also in the seed or in the dependency list.
+Instead, it adds them to the output for the last seed in the
+.Pa STRUCTURE
+file, conventionally called
+.Li supported .
+.Pp
+Like any other seed, the supported seed may contain its own list of
+packages.
+It is common to provide support for many software packages which are not in
+the default installation, such as debugging libraries, optimised kernels,
+alternative language support, and the like.
+.Ss Outputs
+The output files are named after the seed to which they correspond.
+An additional output file is needed for supported, namely
+.Sq supported+build\-depends ,
+which contains the supported list and the build-depends lists of the other
+seeds all joined together.
+An
+.Sq all
+output is produced to represent the entire archive.
+.Pp
+Some other files are produced for occasional use by experts.
+See the
+.Pa README
+file for full details on these.
+.Sh OPTIONS
+.Bl -tag -width 4n
+.It Xo Fl v ,
+.Fl Fl verbose
+.Xc
+Be more verbose when processing seeds.
+.It Xo Fl S ,
+.Fl Fl seed\-source Ar source Ns \&,...
+.Xc
+Fetch seeds from the specified sources.
+The default is
+.Pa http://people.canonical.com/~ubuntu-archive/seeds/ ,
+or
+.Pa http://bazaar.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/
+if the
+.Fl Fl bzr
+option is used.
+You may use
+.Pa file://
+URLs here to fetch seeds from the local file system; for example, if your
+seeds are stored in
+.Pa /home/username/seeds/debian.unstable ,
+then you would use the options
+.Fl S Ar file:///home/username/seeds/
+.Fl s Ar debian.unstable .
+.It Xo Fl s ,
+.Fl Fl seed\-dist Ar dist
+.Xc
+Fetch seeds for distribution
+.Ar dist .
+The default is
+.Li ubuntu.natty .
+.It Xo Fl m ,
+.Fl Fl mirror Ar mirror
+.Xc
+Get package lists from
+.Ar mirror .
+The default is
+.Pa http://archive.ubuntu.com/ubuntu/ .
+May be supplied multiple times; the newest version of each package across
+all archives will win.
+.It Fl Fl source\-mirror Ar mirror
+Get source package lists from
+.Ar mirror .
+The default is to use package lists mirrors.
+May be supplied multiple times; the newest version of each source package
+across all archives will win.
+.It Xo Fl d ,
+.Fl Fl dist Ar dist Ns \&,...
+.Xc
+Operate on the specified distributions.
+The default is
+.Li natty .
+Listing multiple distributions may be useful, for example, when examining
+both a released distribution and its security updates.
+.It Xo Fl a ,
+.Fl Fl arch Ar arch
+.Xc
+Operate on architecture
+.Ar arch .
+The default is
+.Li i386 .
+.It Xo Fl c ,
+.Fl Fl components Ar component Ns \&,...
+.Xc
+Operate on the specified components.
+The default is
+.Li main .
+.It Xo Fl i ,
+.Fl Fl ipv6
+.Xc
+Check IPv6 status of source packages, using the statistics available at
+.Pa http://debdev.fabbione.net/stat/ .
+.It Fl Fl bzr
+Check out seeds from the
+.Ic bzr
+branch found at
+.Ar seed\-source Ns / Ns Ar seed\-dist
+rather than fetching them directly from a URL.
+Requires
+.Ic bzr
+to be installed.
+.It Fl Fl no\-rdepends
+Disable reverse-dependency calculations.
+These calculations cause a large number of small files to be written out in
+the
+.Pa rdepends/
+directory, and may take some time.
+.It Fl Fl seed\-packages Ar parent Ns / Ns Ar pkg Ns \&,...
+Treat each
+.Ar pkg
+as a seed by itself, inheriting from
+.Ar parent
+(i.e. assuming that all packages in the
+.Ar parent
+seed are already installed while calculating the additional dependencies of
+.Ar pkg ) .
+This allows the use of
+.Nm
+to calculate the dependencies of individual extra packages.
+For example,
+.Fl Fl seed\-packages Ar desktop Ns / Ns Ar epiphany\-browser
+will create an
+.Pa epiphany\-browser
+output file listing the additional packages that need to be installed over
+and above the
+.Ar desktop
+seed in order to install
+.Ar epiphany\-browser .
+.El
+.Sh BUGS
+The wiki-style markup in seeds was inherited from an early implementation,
+and is a wart.
+.Pp
+.Nm
+can sometimes be confused by complicated situations involving the order in
+which it encounters dependencies on virtual packages.
+Explicit entries in seeds may be required to work around this.
+.Pp
+Handling of installer packages (udebs) is complicated, poorly documented,
+and doesn't always work quite right: in particular, packages aren't demoted
+to the supported seed when they should be.
+.Sh AUTHORS
+.An Scott James Remnant Aq scott@canonical.com
+.An Colin Watson Aq cjwatson@canonical.com
+.Pp
+.An -nosplit
+.Nm
+is copyright \(co 2004, 2005, 2006, 2007, 2008
+.An Canonical Ltd .
+See the GNU General Public License version 2 or later for copying
+conditions.
+A copy of the GNU General Public License is available in
+.Pa /usr/share/common\-licenses/GPL .

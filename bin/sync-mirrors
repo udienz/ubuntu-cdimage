@@ -1,0 +1,31 @@
+#! /bin/sh
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+# check for nonexisting files in .manifest
+for i in $(awk '{print $3}' "$CDIMAGE_ROOT/www/simple/.manifest"); do 
+    [ -f "$CDIMAGE_ROOT/www/simple/$i" ] || { 
+	echo ".manifest has nonexisting $i"
+	exit 1
+    }
+done
+
+SECRET="$CDIMAGE_ROOT/secret"
+if [ -d "$HOME/secret" ]; then
+	SECRET="$HOME/secret"
+fi
+
+trigger () {
+	echo "$2:"
+	ssh -i "$SECRET/auckland" -o 'StrictHostKeyChecking no' -o 'BatchMode yes' "$1@$2" sleep 1
+}
+
+for host in $TRIGGER_MIRRORS ; do
+	trigger archvsync $host
+done
+
+for host in $TRIGGER_MIRRORS_ASYNC ; do
+	trigger archvsync $host &
+done
+

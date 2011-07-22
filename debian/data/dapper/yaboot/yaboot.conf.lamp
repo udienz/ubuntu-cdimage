@@ -1,0 +1,46 @@
+
+# PowerPC subarch 
+image=/install/powerpc/vmlinux
+	label=lamp-server
+	alias=lamp-server-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="${LAMP_PRESEED} --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc/vmlinux
+	label=lamp-server-expert
+	alias=lamp-server-expert-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="${LAMP_PRESEED} DEBCONF_PRIORITY=low --"
+	initrd-size=8192
+	read-only
+
+# PowerPC64 subarch
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=lamp-server
+	initrd=/install/powerpc64/initrd.gz
+	append="${LAMP_PRESEED} --"
+	initrd-size=8192
+	read-only
+
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=lamp-server-expert
+	initrd=/install/powerpc64/initrd.gz
+	append="${LAMP_PRESEED} DEBCONF_PRIORITY=low --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=lamp-server-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="${LAMP_PRESEED} --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=lamp-server-expert-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="${LAMP_PRESEED} DEBCONF_PRIORITY=low --"
+	initrd-size=8192
+	read-only

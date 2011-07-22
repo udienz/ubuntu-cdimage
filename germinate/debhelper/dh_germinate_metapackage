@@ -1,0 +1,100 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_germinate_metapackage - create metapackages based on seeds
+
+=cut
+
+use strict;
+
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_germinate_metapackage> [S<B<debhelper options>>]
+
+=head1 DESCRIPTION
+
+dh_germinate_metapackage is a debhelper program that generates
+${germinate:Depends} substitutions and adds them to substvars files.
+
+The program will read the C<metapackage-map> file that should have been
+created by a previous run of C<germinate-update-metapackage> for your
+package, and for each seed listed there it will generate dependencies and
+recommendations based on the previous results of
+C<germinate-update-metapackage>. Dependencies will be substituted into your
+package's control file wherever you place the token "${germinate:Depends}",
+and similarly recommendations will be substituted wherever you place the
+token "${germinate:Recommends}".
+
+You must run C<germinate-update-metapackage> before building the source
+package. Normally, source packages that use this program will include an
+C<update> script that will call it with appropriate arguments.
+
+=head1 EXAMPLES
+
+dh_germinate_metapackage is usually called indirectly in a rules file via
+the dh command.
+
+	%:
+		dh --with germinate $@
+
+You must build-depend on at least debhelper (>= 7.0.8) to use this form, and
+in any case you must build-depend on at least germinate (>= 1.18) to use
+this program at all.
+
+It can also be called directly at any time before C<dh_installdeb>.
+
+	build:
+		dh_testdir
+		dh_germinate_metapackage
+
+=cut
+
+init();
+
+my %seeds = ();
+open MAP, 'metapackage-map' or die "Can't open metapackage-map: $!";
+while (<MAP>) {
+	chomp;
+	my ($seed, $metapackage) = split;
+	$seeds{$metapackage} = $seed;
+}
+close MAP;
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+	next unless exists $seeds{$package};
+	my $seed = $seeds{$package};
+	my $arch = package_arch($package);
+
+	open DEPENDS, "$seed-$arch" or die "Can't open $seed-$arch: $!";
+	while (<DEPENDS>) {
+		chomp;
+		s/^\s*//; s/\s*$//;
+		addsubstvar($package, "germinate:Depends", $_);
+	}
+	close DEPENDS;
+
+	open RECOMMENDS, "$seed-recommends-$arch" or die "Can't open $seed-recommends-$arch: $!";
+	while (<RECOMMENDS>) {
+		chomp;
+		s/^\s*//; s/\s*$//;
+		addsubstvar($package, "germinate:Recommends", $_);
+	}
+	close RECOMMENDS;
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>, L<germinate-update-metapackage(1)>
+
+This program is a part of germinate.
+
+=head1 AUTHOR
+
+Colin Watson <cjwatson@ubuntu.com>
+
+Copyright (C) 2009 Canonical Ltd., licensed under the GNU GPL v2 or later.
+
+=cut

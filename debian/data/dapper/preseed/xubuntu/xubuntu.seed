@@ -1,0 +1,9 @@
+# Install the Xubuntu usplash image.
+d-i	base-installer/kernel/linux/extra-packages-2.6	string usplash xubuntu-artwork-usplash
+# Adjust task names for Xubuntu.
+d-i	archive-copier/desktop-task	string xubuntu-standard|xubuntu-desktop
+d-i	archive-copier/ship-task	string xubuntu-ship
+# Install the Xubuntu desktop.
+d-i	pkgsel/install-pattern	string ~t^xubuntu-standard$|~t^xubuntu-desktop$
+# No XFCE translation packages yet.
+d-i	pkgsel/language-pack-patterns	string

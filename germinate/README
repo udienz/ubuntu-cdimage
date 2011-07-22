@@ -1,0 +1,202 @@
+LaMont thinks this is fairly complicated ...
+
+We have "seed"s, these are lists of packages which we consider
+important to be in the distribution.  We divide these into three sets
+for the archive.
+
+	base
+	A core set of packages to build a server or desktop on.
+
+	desktop
+	The functionality for our CD.
+		
+	supported
+	Everything else we want to support, including the
+	build-dependencies of base and desktop.
+
+To form each set, the seed and dependency tree need to be added to
+it.  In order to form the supported set, the build-dependency tree
+for each set needs to be calculated as well, with any dependencies
+resulting added to the build-dependency list to end up in the
+supported set.
+
+Example.
+
+	foo; Depends: bar, baz; Build-Depends: quux.
+	bar; Depends: wibble; Build-Depends: splat.
+	quux; Depends: wobble; Build-Depends: snarf.
+
+If foo is placed in the base seed, then the base dependency list will
+contain its dependencies (bar, baz) and their dependencies (wibble).
+The base build-dependency list will contain the build-dependencies
+of the base seed and dependency list (quux, splat) their dependencies
+(wobble) and their build-dependencies (snarf).
+
+So we end up with:
+	base seed	foo
+	base depends	bar (D foo), baz (D foo), wibble (D bar)
+	base build-deps	quux (BD foo), wobble (D quux), snarf (BD quux)
+
+If wobble had dependencies or build-dependencies, they would also be
+placed in the base build-dependency list.
+
+You therefore get the following output lists; base.seed (the seed list
+itself), base.depends (the dependency list) and base.build-depends
+(the build-dependency list).
+
+
+That was the easy bit...  here's the tricky bit.
+
+Across all three lists for each of the all three sets, every package
+only occurs in only one list.  So going back to our previous example,
+if a package in the desktop seed depends on 'foo' it won't be added
+to the desktop dependency list because it is already in the base
+seed.  Likewise if a package in the desktop dependency list depends
+on 'bar', it won't be added to the desktop dependency list because
+it's already in the base dependency list.
+
+*However* build-dependencies are considered lesser-favoured than
+any seed or dependency list, so if a package needed in the desktop seed
+or dependency list is in the base build-dependency list it will be
+moved out of it and into the list it's needed in.
+
+The actual order of priority is:
+
+	base.seed, base.depends, desktop.seed, desktop.depends,...
+	supported.seed, supported.depends, base.build-depends,...
+	desktop.build-depends, supported.build-depends
+
+With things being moved out of build-depends and into the right set
+(this doesn't affect the others because they're created in the same
+order as the priority.)
+
+
+For each set, the seed and dependency list then get joined together
+to form a list named after the set itself.  This isn't quite all
+that's needed for supported, so another list is output named
+supported+build-depends containing the supported list and the
+build-depends lists of the other sets all joined together.
+
+We then join these together to output an "all" list that represents
+our entire archive.
+
+
+So that's the principal set of lists out of the way, but Germinate
+also keeps track of when source packages are first used (bearing
+in mind that their binaries could be in different sets).  So for
+each set, there's a sources list containing the source packages
+used in that set and not used in any of higher priority.
+
+There's also a build-sources list for the source packages used by
+the build-dependency list but none of the sets themselves nor any
+build-sources list of a higher priority.
+
+For maximum greppability, we also get supported+build-depends.sources
+and all.sources files.
+
+
+What happens to the binary packages created by our sources that
+we don't place in any set?  I'm glad you asked that, they become the
+"extra" seed (the sources list of which is obviously empty so omitted)
+have the dependency tree calculated and placed in the extra dependency
+list and the build-dependencies in the extra build-dependency list
+(although the seeded packages' build-dependencies will already
+have been processed, the build-dependencies of the seeded packages'
+dependencies may not have been).
+
+All three extra lists are at a lower priority even than the
+build dependency lists of the other sets, so a package won't be added
+to the extra dependency or build-dependency lists if they are already
+in any other.
+
+
+So we join this up to get extra, extra.sources and extra.build-sources
+lists.  We add these to the all lists we made earlier and get
+all+extra and all+extra.sources.
+
+These won't all be in the archive, we will almost certainly want to
+cherry-pick from extra but there's a lot of crack in it too.
+
+
+Germinate tries very hard to satisfy package dependencies using the
+existing lists, and in any given sequence of alternative packages or
+virtual dependency it will generally pick a package already added.
+An interesting list of virtual packages and those chosen that provide
+that is output in the provides file.
+
+
+Lastly (oh gods, there's more?!) Germinate waffles quite a bit as it
+runs and there's a _germinate_output file containing this.  Lines
+beginning '?' are missing or unresolvable packages, '*' are choices
+made by Germinate that you might wish to influence and '!' are
+problems with the sets.
+
+    ! Duplicated seed: FOO
+
+	FOO has been placed in multiple seeds.  The better seed
+	always takes precedence (because it gets processed first).
+	
+    ! Promoted BAR from SET to BETTER-SET to satisfy FOO
+
+	BAR was in the SET seed, but is a dependency of FOO which
+	is in BETTER-SET.  Germinate promotes the package to the
+	better set, you can safely remove it from SET if you want
+	as FOO depends on it.
+	
+    * Virtual SET package: WIBBLE
+      - WOBBLE
+      - SNARFLE
+
+	You placed WIBBLE in SET seed, and it is a virtual package
+	(one provided by multiple packages).  Rather than picking
+	one, Germinate assumes you want all of the packages that
+	provide this and lists the ones it adds.
+
+    * Chose WOBBLE out of WIBBLE to satisfy FOO
+
+	FOO depends on the virtual package WIBBLE, and nothing
+	providing that has been seeded or added yet.  Germinate
+	randomly chose WOBBLE, the first package in the list,
+	to satisfy this dependency.
+
+	You can influence this choice by seeding the one you want.
+	
+    * Chose BAR to satisfy FOO
+
+	FOO depends on a list a possible packages, and none of them
+	has been seeded or added yet.  Germinate randomly chose BAR,
+	the first in the list.
+
+	You can influence this choice by seeding the one you want.
+
+    ? Unknown SET package: FOO
+
+	FOO in the SET seed doesn't exist in the Debian archive,
+	at least not in unstable/main currently.  Try removing the
+	cached Packages and Sources files.
+
+    ? Unknown dependency BAR by FOO
+
+	FOO declares a dependency on BAR which can't be satisfied
+	within Debian unstable/main currently.  Try removing the
+	cached Packages and Sources files.
+
+    ? Nothing to choose out of WIBBLE to satisfy FOO
+
+	FOO declares a dependency on virtual package WIBBLE, but
+	nothing in Debian unstable/main currently provides that.
+	Try removing the cached Packages and Sources files.
+
+    ? Nothing to choose to satisfy FOO
+
+	FOO declares a dependency on a list of packages, none of
+	which are currently in Debian unstable/main.  Try removing
+	the cached Packages and Sources files.
+
+    ? Missing source package: QUUX (for FOO)
+
+	FOO's source package is QUUX, but that is missing from the
+	Sources file.  Try removing the Packages and Sources files.
+
+
+<http://wiki.ubuntu.com/SeedManagement>

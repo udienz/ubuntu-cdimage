@@ -1,0 +1,32 @@
+
+# PowerPC subarch 
+image=/install/powerpc/vmlinux
+	label=server-powerpc
+	alias=server
+	initrd=/install/powerpc/initrd.gz
+	append="preseed/file=/cdrom/preseed/server.seed --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc/vmlinux
+	label=server-expert-powerpc
+	alias=server-expert
+	initrd=/install/powerpc/initrd.gz
+	append="preseed/file=/cdrom/preseed/server.seed DEBCONF_PRIORITY=low --"
+	initrd-size=8192
+	read-only
+
+# PowerPC64 subarch
+image=/install/powerpc64/vmlinux
+	label=server-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="preseed/file=/cdrom/preseed/server.seed --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=server-expert-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="preseed/file=/cdrom/preseed/server.seed DEBCONF_PRIORITY=low --"
+	initrd-size=8192
+	read-only

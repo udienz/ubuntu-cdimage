@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# post-boot-hppa
+#
+# Do post-image-building tasks for hppa, to make CDs bootable.
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+# $3 is the image file
+
+set -e
+
+N=$1
+CDROOT=$2
+CDIMAGE=$3
+
+cd $CDROOT/..
+
+# Only disk 1* bootable
+if [ $N != 1 -a $N != 1_NONUS ]; then
+	exit 0
+fi
+
+case $PROJECT in
+    edubuntu)
+	DEFAULT_PRESEED='preseed/file=/cdrom/preseed/edubuntu.seed'
+	;;
+    kubuntu)
+	DEFAULT_PRESEED='preseed/file=/cdrom/preseed/kubuntu.seed'
+	;;
+    ubuntu-server)
+	DEFAULT_PRESEED='preseed/file=/cdrom/preseed/ubuntu-server.seed'
+	;;
+    *)
+	DEFAULT_PRESEED=
+	;;
+esac
+
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    # This should really be:
+    #EXTRA_ARGS='casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop'
+    # ... but this overflows palo's command-line limit.
+    EXTRA_ARGS='casper/enable=true'
+else
+    EXTRA_ARGS=
+fi
+
+K32=$(ls $CDROOT/install/vmlinux-*-hppa32|head -1)
+K64=$(ls $CDROOT/install/vmlinux-*-hppa64|head -1)
+/sbin/palo \
+     --commandline="0/vmlinux $DEFAULT_PRESEED $EXTRA_ARGS root=/dev/ram initrd=0/ramdisk ramdisk_size=1048576" \
+     --recoverykernel="$K32" \
+     --recoverykernel="$K64" \
+     --bootloader="$CDROOT/install/iplboot" \
+     --ramdisk="$CDROOT/install/initrd.gz" \
+     --init-cdrom=$CDIMAGE --configfile=/dev/null

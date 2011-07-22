@@ -1,0 +1,156 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+LIVE_OUT="$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/live"
+
+fetch () {
+	case $1 in
+		'')
+			return 1
+			;;
+		/*)
+			ln "$1" "$2"
+			;;
+		*)
+			ret=0
+			wget -nv "$1" -O "$2" || ret=$?
+			if [ "$ret" -ne 0 ]; then
+				rm -f "$2"
+			fi
+			return $ret
+			;;
+	esac
+}
+
+mkemptydir "$LIVE_OUT"
+
+if [ "$CDIMAGE_LIVE" ]; then
+	GOT_IMAGE=0
+	for arch in $ARCHES; do
+		if fetch "$(find-live-filesystem "$arch" cloop)" \
+				"$LIVE_OUT/$arch.cloop"; then
+			GOT_IMAGE=1
+		elif fetch "$(find-live-filesystem "$arch" squashfs)" \
+				"$LIVE_OUT/$arch.squashfs"; then
+			GOT_IMAGE=1
+		elif fetch "$(find-live-filesystem "$arch" tar.xz)" \
+				"$LIVE_OUT/$arch.tar.xz"; then
+			GOT_IMAGE=1
+		else
+			continue
+		fi
+		if dist_ge dapper; then
+			for item in kernel initrd; do
+				for url in $(find-live-filesystem "$arch" "$item"); do
+					flavour="${url##*/}"
+					flavour="${flavour#*.*.*-}"
+					fetch "$url" "$LIVE_OUT/$arch.$item-$flavour" || true
+				done
+			done
+		fi
+		fetch "$(find-live-filesystem "$arch" manifest)" \
+			"$LIVE_OUT/$arch.manifest" || true
+		fetch "$(find-live-filesystem "$arch" manifest-remove)" \
+			"$LIVE_OUT/$arch.manifest-remove" || \
+			fetch "$(find-live-filesystem "$arch" manifest-desktop)" \
+				"$LIVE_OUT/$arch.manifest-desktop" || true
+		fetch "$(find-live-filesystem "$arch" size)" \
+			"$LIVE_OUT/$arch.size" || true
+
+		if [ "$PROJECT" != livecd-base ] && \
+		   [ "$PROJECT" != edubuntu ] && \
+		   [ "$PROJECT" != kubuntu-mobile ]; then
+			if dist_le feisty; then
+				:
+			elif dist_le intrepid; then
+				if [ "$CDIMAGE_DVD" != 1 ]; then
+					(fetch "$(find-live-filesystem "$arch" wubi)" \
+					"$LIVE_OUT/$arch.wubi.exe" || true)
+				fi
+				(fetch "$(find-live-filesystem "$arch" umenu)" \
+				"$LIVE_OUT/$arch.umenu.exe" || true)
+				if [ -f "$LIVE_OUT/$arch.umenu.exe" ]; then
+					# This is Windows, so use CRLF.
+					cat > "$LIVE_OUT/$arch.autorun.inf" << EOF
+[autorun]
+open=umenu.exe
+icon=umenu.exe,0
+label=Install
+
+[Content]
+MusicFiles=false
+PictureFiles=false
+VideoFiles=false
+EOF
+					todos "$LIVE_OUT/$arch.autorun.inf"
+				fi
+			else
+				# TODO: We still have to do something
+				# about not including Wubi on the DVDs.
+				(fetch "$(find-live-filesystem "$arch" wubi)" \
+					"$LIVE_OUT/$arch.wubi.exe" || true)
+				if [ -f "$LIVE_OUT/$arch.wubi.exe" ]; then
+					# Nicely format the distribution name.
+					PROJ=$(echo "$PROJECT" | tr '-' ' ' | \
+						sed 's/\(\b[a-z]\)/\U\1/g' || echo "PROJECT")
+					cat > "$LIVE_OUT/$arch.autorun.inf" << EOF
+[autorun]
+open=wubi.exe --cdmenu
+icon=wubi.exe,0
+label=Install $PROJ
+
+[Content]
+MusicFiles=false
+PictureFiles=false
+VideoFiles=false
+EOF
+					todos "$LIVE_OUT/$arch.autorun.inf"
+				fi
+			fi
+		fi
+		case "$PROJECT" in
+			kubuntu-netbook|ubuntu-netbook|ubuntu-moblin-remix)
+				fetch "$(find-live-filesystem "$arch" usb-creator)" \
+					"$LIVE_OUT/$arch.usb-creator.exe" || true
+				;;
+			livecd-base|edubuntu)
+				;;
+			*)
+				if [ "$CDIMAGE_DVD" ]; then
+				fetch "$(find-live-filesystem "$arch" usb-creator)" \
+					"$LIVE_OUT/$arch.usb-creator.exe" || true
+				fi
+				if dist_ge maverick; then
+					fetch "$(find-live-filesystem "$arch" usb-creator)" \
+						"$LIVE_OUT/$arch.usb-creator.exe" || true
+				fi
+				;;
+		esac
+	done
+	if [ "$GOT_IMAGE" = 0 ]; then
+		echo "No filesystem images found." >&2
+		exit 1
+	fi
+fi
+
+if [ "$PROJECT" = edubuntu ] && [ "$CDIMAGE_INSTALL" ] && dist_le hardy; then
+	for arch in $CPUARCHES; do
+		if winfoss="$(find-live-filesystem "$arch" winfoss)"; then
+			fetch "$winfoss" "$LIVE_OUT/$arch.winfoss.tgz"
+		fi
+	done
+fi
+
+if [ "$PROJECT" = edubuntu ] && [ "$CDIMAGE_DVD" ] && dist_ge lucid; then
+	for arch in $ARCHES; do
+		case $arch in
+			amd64|i386)
+				fetch "$(find-live-filesystem "$arch" ltsp-squashfs)" \
+					"$LIVE_OUT/$arch.ltsp-squashfs"
+				;;
+		esac
+	done
+fi

@@ -1,0 +1,189 @@
+.Dd Jul 18, 2007
+.Os Ubuntu
+.ds volume-operating-system Ubuntu
+.Dt GERMINATE\-UPDATE\-METAPACKAGE 1
+.Sh NAME
+.Nm germinate\-update\-metapackage
+.Nd update a set of metapackages generated from seeds
+.Sh SYNOPSIS
+.Nm
+.Op Fl Fl bzr
+.Op Fl Fl output-directory Ar dir
+.Op Ar dist
+.Sh DESCRIPTION
+.Nm
+assists with the construction and update of
+.Dq metapackages
+(packages consisting solely of a list of dependencies) from a list of seed
+packages.
+It updates binary package stanzas in
+.Pa debian/control
+to reflect the current contents of the seeds, and updates
+.Pa debian/changelog
+with a description of the changes it made.
+.Pp
+.Nm
+requires a configuration file, called
+.Pa update.cfg ,
+in the current directory.
+The format is described below.
+.Pp
+If a non-option argument is given, it specifies the distribution for which
+metapackages should be generated (e.g.\&
+.Dq unstable ) .
+.Sh OPTIONS
+.Bl -tag -width 4n
+.It Fl Fl nodch
+Don't modify
+.Pa debian/changelog .
+.It Fl Fl bzr
+Check out seeds from the
+.Ic bzr
+branch defined in the configuration file rather than fetching them directly
+from the URL defined there.
+Requires
+.Ic bzr
+to be installed.
+.It Xo Fl o ,
+.Fl Fl output-directory Ar dir
+.Xc
+Output the package lists in the specified directory.
+.El
+.Sh CONFIGURATION FILE
+.Pa update.cfg
+uses Python's ConfigParser configuration file syntax, supporting
+interpolation as defined by SafeConfigParser.
+It should have a
+.Li DEFAULT
+section with a
+.Li dist
+key indicating the default distribution, and a
+.Ar dist
+section (corresponding to that distribution).
+It may also have a
+.Ar dist Ns Li /bzr
+section which can override the
+.Li seed_base
+and
+.Li seed_dist
+values from the
+.Ar dist
+section if the
+.Fl Fl bzr
+option is given.
+The following keys are recognised in distribution sections:
+.Bl -tag -width 4n
+.It Li seeds No (mandatory)
+Pass these seeds to the germinator for processing.
+.It Li output_seeds No (optional, deprecated)
+Generate metapackages for these seeds.
+If not specified, the value of
+.Li seeds
+is used.
+This option is usually no longer necessary now that the value of
+.Li seeds
+is automatically expanded for seed inheritance.
+.It Li architectures No (mandatory)
+Generate metapackages for these architectures.
+.It Li archive_base/default No (optional)
+Use this URL as the default base for fetching package indices from the
+archive; for examples of valid URLs, see
+.Li deb
+lines in
+.Pa /etc/apt/sources.list ,
+or the
+.Ar MIRROR
+argument to
+.Xr debootstrap 8 .
+.It Li archive_base/ Ns Ar arch No (optional)
+Use this URL as the base for fetching package indices from the archive for
+the specified architecture.
+For each architecture being processed, at least one of
+.Li archive_base/default
+and
+.Li archive_base/ Ns Ar arch
+must be present.
+To try multiple URLs, separate them with commas or spaces;
+the newest version of each package across all archives will win.
+Note that
+.Xr debootstrap 8
+will only use the first archive.
+.It Li seed_base No (mandatory)
+The base URL for fetching seeds.
+To try multiple URLs (for example if a seed branch includes another branch
+stored at a different location), separate them with commas or spaces.
+.It Li seed_dist No (optional)
+The tail of the URL for fetching seeds.
+This will be appended to
+.Li seed_base .
+You will often want to interpolate the value of
+.Li dist
+into this value using ConfigParser's
+.Li %(dist)s
+syntax.
+If not specified, the value of
+.Li dist
+is used.
+.It Li components No (mandatory)
+The archive components from which to fetch package indices.
+.It Li seed_map/ Ns Ar seed No (optional, deprecated)
+The seeds to be used as input for the metapackage corresponding to
+.Ar seed .
+If specified, this will typically be the list of seeds from which
+.Ar seed
+inherits, plus
+.Ar seed
+itself.
+This option is usually no longer necessary; use a
+.Li Task\-Seeds
+header in the seed file instead.
+.It Li metapackage_map/ Ns Ar seed No (optional, deprecated)
+The metapackage name to output for
+.Ar seed .
+If not specified,
+.Nm
+will look for the name of the source package in which it is being run,
+remove "meta" from the end, and append the seed name.
+This option is usually no longer necessary; use a
+.Li Task\-Metapackage
+header in the seed file instead.
+.El
+.Sh EXAMPLE
+At the time of writing, the following configuration file is used to generate
+the
+.Li kubuntu-meta
+source package in the Ubuntu archive:
+.Bd -literal -offset indent
+[DEFAULT]
+dist: natty
+
+[natty]
+seeds: desktop netbook
+architectures: i386 amd64 powerpc armel
+seed_base: http://people.canonical.com/~ubuntu-archive/seeds/
+seed_dist: kubuntu.%(dist)s
+archive_base/default: http://archive.ubuntu.com/ubuntu/
+archive_base/ports: http://ports.ubuntu.com/ubuntu-ports/
+archive_base/powerpc: %(archive_base/ports)s
+archive_base/armel: %(archive_base/ports)s
+components: main restricted
+
+[natty/bzr]
+seed_base: bzr+ssh://bazaar.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/
+seed_dist: kubuntu.%(dist)s
+.Ed
+.Sh AUTHORS
+.An Gustavo Franco Aq stratus@debian.org
+.An Colin Watson Aq cjwatson@canonical.com
+.Pp
+.An -nosplit
+.Nm
+is copyright \(co 2004, 2005, 2006, 2007, 2008
+.An Canonical Ltd.
+and
+copyright \(co 2006
+.An Gustavo Franco .
+See the GNU General Public License version 2 or later for copying
+conditions.
+A copy of the GNU General Public License is available in
+.Pa /usr/share/common\-licenses/GPL .

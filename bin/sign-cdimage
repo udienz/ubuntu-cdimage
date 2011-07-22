@@ -1,0 +1,26 @@
+#! /bin/sh
+set -e
+
+# Sign a file with the cdimage key.
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ]; then
+	echo 'Usage: sign-cdimage FILE' >&2
+	exit 1
+fi
+
+FILE="$1"
+
+if [ ! -f "$GNUPG_DIR/secring.gpg" ] || [ ! -f "$GNUPG_DIR/pubring.gpg" ] || \
+   [ ! -f "$GNUPG_DIR/trustdb.gpg" ] || [ -z "$SIGNING_KEYID" ]; then
+	echo 'No keys found; not signing images.' >&2
+	exit
+fi
+gpg --no-default-keyring \
+	--secret-keyring "$GNUPG_DIR/secring.gpg" \
+	--keyring "$GNUPG_DIR/pubring.gpg" \
+	--trustdb-name "$GNUPG_DIR/trustdb.gpg" \
+	--default-key "$SIGNING_KEYID" --no-options --batch --no-tty \
+	--armour --detach-sign < "$FILE" > "$FILE.gpg"

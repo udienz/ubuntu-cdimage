@@ -1,0 +1,33 @@
+chooser=textmenu
+default=Live
+delay=20
+prompt
+relocatable
+
+message=/efi/boot/elilo_menu.msg
+f1=/efi/boot/general.msg
+f2=/efi/boot/params.msg
+
+image=/linux
+    label=Live
+    description="Linux [Live]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="boot=casper ramdisk_size=1048576 quiet splash --"
+    read-only
+
+image=/linux
+    label=LiveSerial
+    description="Linux [Live] [serial console]"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="boot=casper ramdisk_size=1048576 console=ttyS0 --"
+    read-only
+
+image=/linux
+    label=Check
+    description="Check CD for defects"
+    initrd=/initrd.gz
+    root=/dev/ram
+    append="boot=casper integrity-check ramdisk_size=1048576 quiet splash --"
+    read-only

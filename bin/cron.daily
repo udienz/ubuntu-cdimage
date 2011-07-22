@@ -1,0 +1,16 @@
+#! /bin/sh
+set -e
+
+export IMAGE_TYPE=daily
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+PATH="$CDIMAGE_ROOT/bin${PATH:+:$PATH}"
+
+export CDIMAGE_INSTALL=1
+if [ "$PROJECT" = edubuntu ]; then
+	export CDIMAGE_ADDON=1
+fi
+
+build-image-set "$IMAGE_TYPE"

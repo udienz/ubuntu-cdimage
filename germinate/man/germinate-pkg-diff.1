@@ -1,0 +1,106 @@
+.Dd Jul 18, 2007
+.Os Ubuntu
+.ds volume-operating-system Ubuntu
+.Dt GERMINATE\-PKG\-DIFF 1
+.Sh NAME
+.Nm germinate\-pkg\-diff
+.Nd compare seeds against currently installed packages
+.Sh SYNOPSIS
+.Nm
+.Op Fl l Ar file
+.Op Fl m Brq Li i Ns | Ns Li r Ns | Ns Li d
+.Op Fl a Ar arch
+.Op Ar seeds
+.Sh DESCRIPTION
+.Nm
+compares the expansion of a list of seed packages against the set of
+packages installed on the current system.
+When constructing seeds for a software distribution, it can be used to
+iteratively find packages installed on developers' systems that should be
+included in the seeds.
+.Pp
+A list of seeds against which to compare may be supplied as non-option
+arguments.
+Seeds from which they inherit will be added automatically.
+The default is
+.Sq desktop .
+.Sh OPTIONS
+.Bl -tag -width 4n
+.It Xo Fl l ,
+.Fl Fl list Ar file
+.Xc
+Read the list of currently installed packages from
+.Ar file .
+The default is to read the output of
+.Ic dpkg Fl Fl get\-selections ,
+and any supplied file should be in the same format.
+.It Xo Fl m ,
+.Fl Fl mode Brq Li i Ns | Ns Li r Ns | Ns Li d
+.Xc
+Set the output mode as follows:
+.Bl -tag -width 4n
+.It Li i
+Show the
+.Ic dpkg
+selections needed to install just these seeds.
+List unseeded but installed files as
+.Dq deinstall ,
+and seeded but uninstalled files as
+.Dq install .
+.It Li r
+List unseeded but installed files as
+.Dq install ,
+and seeded but uninstalled files as
+.Dq deinstall .
+.It Li d
+Show the differences between the packages specified by the seeds and the
+list of installed packages, in a somewhat
+.Ic diff Ns -like
+format.
+.El
+.It Xo Fl S ,
+.Fl Fl seed\-source Ar source Ns \&,...
+.Xc
+Fetch seeds from the specified sources.
+The default is
+.Pa http://people.canonical.com/~ubuntu-archive/seeds/ .
+.It Xo Fl s ,
+.Fl Fl seed\-dist Ar dist
+.Xc
+Fetch seeds for distribution
+.Ar dist .
+The default is
+.Li ubuntu.natty .
+.It Xo Fl d ,
+.Fl Fl dist Ar dist Ns \&,...
+.Xc
+Operate on the specified distributions.
+The default is
+.Li natty .
+Listing multiple distributions may be useful, for example, when examining
+both a released distribution and its security updates.
+.It Xo Fl a ,
+.Fl Fl arch Ar arch
+.Xc
+Operate on architecture
+.Ar arch .
+The default is
+.Li i386 .
+.El
+.Sh BUGS
+.Fl Fl mode Li r
+is useless as
+.Ic dpkg Fl Fl set\-selections
+input.
+.Sh AUTHORS
+.An Lamont Jones Aq lamont@ubuntu.com
+.An Colin Watson Aq cjwatson@canonical.com
+.Pp
+.An -nosplit
+.Nm
+is copyright \(co 2004, 2005, 2006, 2007, 2008
+.An Canonical Ltd .
+See the GNU General Public License version 2 or later for copying
+conditions.
+A copy of the GNU General Public License is available in
+.Pa /usr/share/common\-licenses/GPL .

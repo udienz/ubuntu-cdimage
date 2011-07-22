@@ -1,0 +1,22 @@
+#! /bin/sh
+set -e
+
+export IMAGE_TYPE=dvd
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+PATH="$CDIMAGE_ROOT/bin${PATH:+:$PATH}"
+
+if [ "$PROJECT" = edubuntu ]; then
+	# Edubuntu lucid and onwards: DVD is live-only
+	if dist_le karmic; then
+		export CDIMAGE_INSTALL=1
+	fi
+else
+	export CDIMAGE_INSTALL=1
+fi
+export CDIMAGE_LIVE=1
+export CDIMAGE_DVD=1
+
+build-image-set "$IMAGE_TYPE"

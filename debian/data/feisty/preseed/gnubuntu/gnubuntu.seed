@@ -1,0 +1,2 @@
+# Install the Gnubuntu desktop.
+tasksel	tasksel/first	multiselect gnubuntu-desktop

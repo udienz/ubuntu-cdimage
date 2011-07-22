@@ -1,0 +1,255 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+export IMAGE_TYPE="${1:-daily}"
+
+# Yes, this is a very crude cleanup stack mechanism. I don't feel like
+# doing better in POSIX sh.
+
+CLEANUP=:
+
+push_cleanup () {
+	CLEANUP="$CLEANUP; $1"
+}
+
+pop_cleanup () {
+	case $CLEANUP in
+		:)	;;
+		*)
+			CLEANUP_COMMAND="${CLEANUP##*; }"
+			eval "$CLEANUP_COMMAND"
+			CLEANUP="${CLEANUP%; *}"
+			;;
+	esac
+}
+
+cleanup () {
+	EXITCODE="$?"
+	while [ "$CLEANUP" != : ]; do
+		pop_cleanup
+	done
+	if [ "$CDIMAGE_DATE" ] && [ -z "$DEBUG" ] && [ "$EXITCODE" != 0 ]; then
+		ADDRESSES="$(get_notify_addresses "$PROJECT")"
+		if [ "$ADDRESSES" ]; then
+			mail -s "CD image $PROJECT/$DIST/$IMAGE_TYPE failed to build on $CDIMAGE_DATE" \
+				-a 'X-Generated-By: build-image-set' \
+				$ADDRESSES \
+				<"$CDIMAGE_ROOT/log/$PROJECT/$DIST/$IMAGE_TYPE-$CDIMAGE_DATE.log"
+		fi
+	fi
+	exit "$EXITCODE"
+}
+
+trap cleanup EXIT HUP INT QUIT TERM
+
+if ! lockfile -l 7200 -r 0 "$CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE"; then
+	echo "Another image set is already building!" >&2
+	exit 1
+fi
+push_cleanup "rm -f $CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE"
+
+SEM="$CDIMAGE_ROOT/etc/.sem-build-image-set"
+# Set up a counting semaphore for parallel builds.
+if ! SEM_STATE="$(semaphore test-increment "$SEM")"; then
+	# semaphore failed, something went badly wrong
+	exit 1
+fi
+push_cleanup "semaphore decrement-test $SEM >/dev/null"
+
+export CDIMAGE_DATE="$(next-build-date "$IMAGE_TYPE")"
+
+export PROJECT CAPPROJECT DIST ARCHES
+
+case $PROJECT in
+	gobuntu)
+		export CDIMAGE_ONLYFREE=1
+		;;
+	edubuntu)
+		if dist_ge karmic; then
+			export CDIMAGE_UNSUPPORTED=1
+		fi
+		;;
+	xubuntu)
+		if dist_ge hardy; then
+			export CDIMAGE_UNSUPPORTED=1
+		fi
+		;;
+	kubuntu-kde4|kubuntu-netbook|kubuntu-mobile)
+		export CDIMAGE_UNSUPPORTED=1
+		;;
+	ubuntustudio)
+		export CDIMAGE_UNSUPPORTED=1
+		;;
+	mythbuntu)
+		export CDIMAGE_UNSUPPORTED=1
+		;;
+	lubuntu)
+		export CDIMAGE_UNSUPPORTED=1
+		;;
+	ubuntu-moblin-remix)
+		export CDIMAGE_UNSUPPORTED=1
+		;;
+esac
+
+if [ "$CDIMAGE_INSTALL" ]; then
+	export CDIMAGE_INSTALL_BASE=1
+fi
+
+if [ -z "$DEBUG" ]; then
+	mkdir -p "$CDIMAGE_ROOT/log/$PROJECT/$DIST"
+	exec >"$CDIMAGE_ROOT/log/$PROJECT/$DIST/$IMAGE_TYPE-$CDIMAGE_DATE.log" 2>&1
+	# Since we now know we aren't going to be spamming the terminal,
+	# it's safe to crank up the verbosity so that the logs are most
+	# useful.
+	export VERBOSE=3
+fi
+
+if [ -z "$CDIMAGE_NOSYNC" ]; then
+	SYNC_LOCK="$CDIMAGE_ROOT/etc/.lock-archive-sync"
+	if [ "$SEM_STATE" = 0 ]; then
+		echo "===== Syncing $CAPPROJECT mirror ====="
+		date
+		# Acquire lock to allow parallel builds to ensure a
+		# consistent archive.
+		if ! lockfile -r 4 "$SYNC_LOCK"; then
+			echo "Couldn't acquire archive sync lock!" >&2
+			exit 1
+		fi
+		push_cleanup "rm -f $SYNC_LOCK"
+		anonftpsync
+		ARCHES_COLONS="$(echo "$CPUARCHES" | tr ' ' ':')"
+		if [ "$CDIMAGE_UNSUPPORTED" ]; then
+			ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.universe" anonftpsync
+			for component in main restricted; do
+				for distdir in "$CDIMAGE_ROOT/ftp/dists"/*; do
+					[ -d "$distdir" ] || continue
+					newdistdir="$(echo "$distdir" | sed 's/ftp/ftp-universe/')"
+					if [ -d "$distdir/$component" ] && [ -d "$newdistdir" ]; then
+						ln -nsf "$distdir/$component" "$newdistdir/$component"
+					fi
+				done
+				if [ -d "$CDIMAGE_ROOT/ftp/pool/$component" ] && [ -d "$CDIMAGE_ROOT/ftp-universe/pool" ]; then
+					ln -nsf "$CDIMAGE_ROOT/ftp/pool/$component" "$CDIMAGE_ROOT/ftp-universe/pool/$component"
+				fi
+			done
+		else
+			case :$ARCHES_COLONS: in
+				*:armel:*|*:hppa:*|*:ia64:*|*:lpia:*)
+					ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.ports" anonftpsync
+					;;
+				*:powerpc:*)
+					if dist_ge gutsy; then
+						ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.ports" anonftpsync
+					fi
+					;;
+				*:sparc:*)
+					if dist_ge hardy; then
+						ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.ports" anonftpsync
+					fi
+					;;
+			esac
+		fi
+		pop_cleanup
+	else
+		echo "===== Parallel build; waiting for $CAPPROJECT mirror to sync ====="
+		date
+		if ! lockfile -8 -r 450 "$SYNC_LOCK"; then
+			echo "Timed out waiting for archive sync lock!" >&2
+			exit 1
+		fi
+		rm -f "$SYNC_LOCK"
+	fi
+fi
+
+if [ "$LOCAL" ]; then
+	echo "===== Updating archive of local packages ====="
+	date
+	update-local-indices
+fi
+
+if [ -d "$CDIMAGE_ROOT/britney/update_out" ]; then
+	echo "===== Building britney ====="
+	date
+	make -C "$CDIMAGE_ROOT/britney/update_out" || \
+		! [ -f "$CDIMAGE_ROOT/britney/update_out/Makefile" ]
+fi
+
+echo "===== Extracting debootstrap scripts ====="
+date
+extract-debootstrap
+
+echo "===== Germinating ====="
+date
+run-germinate
+
+echo "===== Generating new task lists ====="
+date
+germinate-to-tasks "$IMAGE_TYPE"
+
+echo "===== Checking for other task changes ====="
+date
+update-tasks "$CDIMAGE_DATE" "$IMAGE_TYPE"
+
+if [ "$CDIMAGE_LIVE" ] || [ "$PROJECT" = edubuntu ]; then
+	echo "===== Downloading live filesystem images ====="
+	date
+	download-live-filesystems
+fi
+
+if [ -z "$SPLASHRLE" ]; then
+	if [ -e "$CDIMAGE_ROOT/debian-cd/data/$DIST/$PROJECT.rle" ]; then
+		export SPLASHRLE="$CDIMAGE_ROOT/debian-cd/data/$DIST/$PROJECT.rle"
+	else
+		export SPLASHRLE="$CDIMAGE_ROOT/debian-cd/data/$DIST/splash.rle"
+	fi
+fi
+if [ -z "$GFXSPLASH" ]; then
+	if [ -e "$CDIMAGE_ROOT/debian-cd/data/$DIST/$PROJECT.pcx" ]; then
+		export GFXSPLASH="$CDIMAGE_ROOT/debian-cd/data/$DIST/$PROJECT.pcx"
+	else
+		export GFXSPLASH="$CDIMAGE_ROOT/debian-cd/data/$DIST/splash.pcx"
+	fi
+fi
+if [ -z "$SPLASHPNG" ]; then
+	if [ -e "$CDIMAGE_ROOT/debian-cd/data/$DIST/$PROJECT.png" ]; then
+		export SPLASHPNG="$CDIMAGE_ROOT/debian-cd/data/$DIST/$PROJECT.png"
+	else
+		export SPLASHPNG="$CDIMAGE_ROOT/debian-cd/data/$DIST/splash.png"
+	fi
+fi
+
+echo "===== Building $CAPPROJECT daily CDs ====="
+date
+cd "$CDIMAGE_ROOT/debian-cd"
+./build_all.sh || true
+
+# Kludge to work around permission-handling problems elsewhere.
+find "$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE" -type d -print0 | xargs -0r chmod g+s 2>/dev/null || true
+chmod -R g+rwX "$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE" 2>/dev/null || true
+
+# temporarily turned off for live builds
+if [ "$CDIMAGE_INSTALL_BASE" ]; then
+	echo "===== Producing installability report ====="
+	date
+	check-installable
+fi
+
+if [ -z "$DEBUG" ] && [ -z "$CDIMAGE_NOPUBLISH" ]; then
+	echo "===== Publishing ====="
+	date
+	publish-daily "$CDIMAGE_DATE" "$IMAGE_TYPE"
+
+	echo "===== Purging old images ====="
+	date
+	purge-old-images "$IMAGE_TYPE"
+
+	echo "===== Triggering mirrors ====="
+	date
+	sync-mirrors
+fi
+
+echo "===== Finished ====="
+date

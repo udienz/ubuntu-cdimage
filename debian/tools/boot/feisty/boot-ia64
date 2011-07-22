@@ -1,0 +1,86 @@
+#!/bin/bash
+#
+# boot-ia64
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+
+. $BASEDIR/tools/boot/$DI_CODENAME/common.sh
+
+set -e
+set -x
+
+N=$1
+CDDIR=$2
+BOOTDIR=
+if [ "$DI_WWW_HOME" = "default" ];then
+   DI_WWW_HOME="http://people.debian.org/~jbailey/d-i/ia64/daily"
+fi
+if [ ! "$DI_DIST" ]; then
+   export DI_DIST="$DI_CODENAME"
+fi
+if [ -z "$DI_PATH" ]; then
+   DI_PATH="$($BASEDIR/tools/find-newest-installer)"
+fi
+
+# TODO: finish support for this
+default_preseed
+
+cd $CDDIR/..
+
+# Only disc 1 bootable
+if [ $N != 1 -a $N != 1_NONUS ]; then 
+	echo "-J" > $N.mkisofs_opts
+	exit 0; 
+fi
+
+# Download boot images
+for image in boot.img; do
+    if [ ! -e "$image" ]; then
+	if [ ! "$DI_WWW_HOME" ];then
+		cp "$DI_PATH/current/images/cdrom/$image" . || \
+		cp "$DI_PATH/current/images/$image" .
+		cp "$DI_PATH/current/images/cdrom/debian-cd_info.tar.gz" . || true
+	else
+		wget "$DI_WWW_HOME/cdrom/$image" || \
+		wget "$DI_WWW_HOME/$image"
+		wget "$DI_WWW_HOME/cdrom/debian-cd_info.tar.gz" || true
+	fi
+    fi
+done
+# TODO: copy casper's kernel and initrd into boot.img if present
+
+install_languages $CDDIR
+
+if [ -f debian-cd_info.tar.gz ]; then
+    mkdir -p elilo
+    cat debian-cd_info.tar.gz | (cd elilo/; tar zx)
+fi
+
+mkdir -p boot$N/boot
+cp -f boot.img boot$N/boot/
+echo -n "-no-emul-boot -J -b boot/boot.img -c boot/boot.catalog boot$N"  > $N.mkisofs_opts
+
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+    ELILO_SUFFIX=
+else
+    ELILO_SUFFIX=.live
+    if [ -d elilo ]; then
+	for file in elilo/*.live; do
+	    target="$(basename "$file")"
+	    target="${target%.live}"
+	    mdel -i boot$N/boot/boot.img "::/efi/boot/$target" || true
+	    mcopy -i boot$N/boot/boot.img "$file" "::/efi/boot/$target"
+	done
+    fi
+fi
+mdel -i boot$N/boot/boot.img ::/elilo.conf ::/efi/boot/elilo.conf
+mcopy -i boot$N/boot/boot.img \
+    $BASEDIR/data/$CODENAME/elilo/elilo.conf$ELILO_SUFFIX \
+    ::/elilo.conf
+mcopy -i boot$N/boot/boot.img \
+    $BASEDIR/data/$CODENAME/elilo/elilo.conf$ELILO_SUFFIX \
+    ::/efi/boot/elilo.conf
+
+# done
+

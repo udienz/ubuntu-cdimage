@@ -1,0 +1,17 @@
+
+# PowerPC subarch 
+image=/install/powerpc/vmlinux
+	label=oem-powerpc
+	alias=oem
+	initrd=/install/powerpc/initrd.gz
+	append="preseed/file=/cdrom/preseed/oem.seed --"
+	initrd-size=8192
+	read-only
+
+# PowerPC64 subarch
+image=/install/powerpc64/vmlinux
+	label=oem-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="preseed/file=/cdrom/preseed/oem.seed --"
+	initrd-size=8192
+	read-only

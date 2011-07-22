@@ -1,0 +1,710 @@
+germinate (1.25) unstable; urgency=low
+
+  * Only raise an exception from open_tag_files if an appropriate file is
+    not found on any mirror (thanks, Tom Gall, Steve Langasek, and Barry
+    Warsaw; LP: #717879).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 05 Apr 2011 15:36:38 +0100
+
+germinate (1.24) unstable; urgency=low
+
+  * Always refresh copies of local Packages and Sources files (i.e. when
+    using the file: scheme).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 21 Dec 2010 14:32:07 +0000
+
+germinate (1.23) unstable; urgency=low
+
+  * Write out entire decompressed Packages/Sources files in one go, rather
+    than line-by-line.  This is a bit faster.
+  * Convert to dh_python2.
+  * Change default distribution to natty.
+  * Update kubuntu-meta example in germinate-update-metapackage(1) (remove
+    ia64 and sparc).
+
+ -- Colin Watson <cjwatson@debian.org>  Fri, 15 Oct 2010 22:09:07 +0100
+
+germinate (1.22) unstable; urgency=low
+
+  * Change default distribution to maverick.
+  * Update kubuntu-meta example in germinate-update-metapackage(1) (remove
+    lpia).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 18 Aug 2010 13:18:27 +0100
+
+germinate (1.21) unstable; urgency=low
+
+  [ Julian Andres Klode ]
+  * Port the code to the new python-apt API and require at least
+    version 0.7.93.2 of python-apt (closes: #571744).
+
+  [ Colin Watson ]
+  * Convert to source format 3.0 (native).
+  * Policy version 3.8.4: no changes required.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 06 Apr 2010 11:24:24 +0100
+
+germinate (1.20) unstable; urgency=low
+
+  * Add 'make check' which runs pychecker if available, and make it pass.
+  * Change default distribution to lucid.
+  * Update kubuntu-meta example in germinate-update-metapackage(1) (add
+    netbook; remove hppa; add armel).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 26 Nov 2009 12:50:56 +0000
+
+germinate (1.19) unstable; urgency=low
+
+  [ Colin Watson ]
+  * Fix interpretation of architecture-specific regex seed entries where the
+    regex contains a character class (which looks a bit like an architecture
+    specification in the wrong light).
+
+  [ Loïc Minier ]
+  * Document --source-mirror option in germinate(1).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 21 Oct 2009 19:55:16 +0100
+
+germinate (1.18) unstable; urgency=low
+
+  * Make germinate-update-metapackage write out a metapackage-map file,
+    which is useful for later determining the set of seeds and metapackages
+    to build.
+  * Add a debhelper addon, useful for building metapackages.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Mon, 10 Aug 2009 23:36:23 +0100
+
+germinate (1.17) unstable; urgency=low
+
+  * Use people.canonical.com everywhere rather than people.ubuntu.com.
+  * Change default distribution to karmic.
+  * Convert to debhelper 7. I've taken some care to avoid use of the new
+    override targets since Ubuntu hardy-jaunty don't have a debhelper that
+    supports those.
+  * Policy version 3.8.2: no changes required.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Sun, 26 Jul 2009 15:38:01 +0100
+
+germinate (1.16) unstable; urgency=low
+
+  * Pass germinate-update-metapackage's list of components to debootstrap.
+  * Replace internal wiki link in README with something world-readable.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 17 Jun 2009 21:16:40 +0100
+
+germinate (1.15) unstable; urgency=low
+
+  * Fix handling of archives that only contain uncompressed index files
+    (thanks to Chris Cheney for the report).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 03 Jun 2009 17:34:09 +0100
+
+germinate (1.14) unstable; urgency=low
+
+  * If germinate-update-metapackage fails, just print a message on stderr
+    and exit 1, rather than raising RuntimeError (LP: #323714).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 06 Mar 2009 09:59:32 +0000
+
+germinate (1.13) unstable; urgency=low
+
+  * Document 'germinate -v' in its manual page.
+  * Report stderr as well as stdout from debootstrap failures (thanks, Loïc
+    Minier; LP: #331488).
+  * Use 'key in dict' rather than 'dict.has_key(key)'; dict.has_key is
+    deprecated in Python 2.6.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 25 Feb 2009 16:33:13 +0000
+
+germinate (1.12) unstable; urgency=low
+
+  * Change default distribution to jaunty.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Mon, 02 Feb 2009 10:52:21 +0000
+
+germinate (1.11) unstable; urgency=low
+
+  * Keep going if the blacklist file can't be downloaded. (This was always
+    the intent, but foiled by an implementation error.)
+  * Clarify the purpose of individual blacklist entries in seeds in
+    germinate(1).
+  * Render the description of special seed syntax in germinate(1) as a tag
+    list, to make it easier to read.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 30 Sep 2008 23:07:21 +0100
+
+germinate (1.10) unstable; urgency=low
+
+  * Increase the recursion limit to 2000 for now to avoid running into
+    problems with very deep dependency chains following code changes in 1.9.
+    Other solutions are possible; this is a quick temporary hack.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 23 Sep 2008 22:24:46 +0100
+
+germinate (1.9) unstable; urgency=low
+
+  * Fix fallback from .bz2 files when OSError is raised.
+  * Try promoting alternative dependencies before adding new packages to the
+    output. While the first dependency in an |-ed list may be promoted from
+    any lesser seed, doing this for all alternatives produces pathological
+    output, so instead we only promote from "close-by" lesser seeds, i.e.
+    those that list the current seed in a Task-Seeds header (LP: #271309).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 19 Sep 2008 01:05:19 +0100
+
+germinate (1.8) unstable; urgency=low
+
+  [ Evan Dandrea ]
+  * Fix -S example to use file:// where the rest of the documentation says
+    you should (LP: #264471).
+
+  [ Colin Watson ]
+  * Prefer Packages.bz2 and Sources.bz2 to .gz if possible; if neither
+    works, fall back to the uncompressed files.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 11 Sep 2008 11:37:09 +0100
+
+germinate (1.7) unstable; urgency=low
+
+  * Add support for setting per-seed features, so that following Recommends
+    can be disabled for some seeds but not others (LP: #254042).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Mon, 01 Sep 2008 01:40:19 +0100
+
+germinate (1.6) unstable; urgency=low
+
+  * Adjust printing of helpful ssh error messages when bzr fails (and
+    re-raising of SeedError) to avoid causing problems when update.cfg
+    contains multiple entries in seed_base.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 28 Aug 2008 22:47:40 +0100
+
+germinate (1.5) unstable; urgency=low
+
+  * Consider whether there are any moves as well as additions or removals
+    when deciding whether to run dch.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 18 Jul 2008 10:36:56 +0100
+
+germinate (1.4) unstable; urgency=low
+
+  [ François-Denis Gonthier ]
+  * Display stdout from debootstrap on error.
+  * --nodch shouldn't make germinate-update-metapackage display the 'No
+    changes found' message.
+  * Add a general description to germinate-update-metapackage's help output.
+  * Add --output-directory to germinate-update-metapackage.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 11 Jul 2008 15:36:10 +0100
+
+germinate (1.3) unstable; urgency=low
+
+  [ François-Denis Gonthier ]
+  * Add --nodch option to germinate-update-metapackage (LP: #242374).
+
+  [ Colin Watson ]
+  * Follow Recommends if 'feature follow-recommends' is set in the seed
+    STRUCTURE file.
+  * Document seed headers in germinate(1) (suggestion from François-Denis
+    Gonthier).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 04 Jul 2008 19:47:13 +0100
+
+germinate (1.2) unstable; urgency=low
+
+  [ Nicolas Barcet ]
+  * Generate a seedstructure.dot diagram of seed inheritance.
+
+  [ Colin Watson ]
+  * Ensure that /usr/sbin and /sbin are on PATH when running debootstrap
+    (closes: #487706). Requires Python 2.4.
+
+ -- Colin Watson <cjwatson@debian.org>  Tue, 24 Jun 2008 15:40:08 +0100
+
+germinate (1.1) unstable; urgency=low
+
+  * Only raise SeedError from open_seed if all attempts to open the seed
+    failed; otherwise using multiple seed sources breaks.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 29 May 2008 16:27:37 +0100
+
+germinate (1.0) unstable; urgency=low
+
+  * Check whether versions in dependencies are satisfied (LP: #74514).
+  * Exclude Essential packages from metapackage dependencies (LP: #42261).
+  * Make metapackage changelog entries more concise by merging items for
+    multiple architectures (LP: #217963).
+  * Print a helpful error message if an ssh connection fails, on the
+    assumption that it's often due to an incorrect username (LP: #99123).
+  * Document fetching seeds from the local file system (closes: #363536).
+  * Add an example of using --seed-packages.
+  * Change default distribution to intrepid. Update kubuntu-meta example in
+    germinate-update-metapackage(1).
+  * With all reported Ubuntu bugs fixed and only one organisationally-tricky
+    Debian bug left, I think it's about time to bump the version to 1.0.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 09 May 2008 11:37:11 +0100
+
+germinate (0.45) unstable; urgency=low
+
+  * Add missing apt_pkg.InitSystem() calls (LP: #215625).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 11 Apr 2008 12:19:47 +0100
+
+germinate (0.44) unstable; urgency=low
+
+  * Support multiple archives (LP: #182915). Patch mostly from
+    Francois-Denis Gonthier, adjusted and extended by me.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 10 Apr 2008 08:40:59 +0100
+
+germinate (0.43) unstable; urgency=low
+
+  * Fix crash when using --seed-packages option.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 02 Apr 2008 06:52:24 +0100
+
+germinate (0.42) unstable; urgency=low
+
+  * Change Maintainer address back to cjwatson@ubuntu.com; I generally work
+    on this package on work time.
+  * germinate-update-metapackage honours new Task-Seeds and Task-Metapackage
+    seed headers, replacing previous seed_map/* and metapackage_map/*
+    entries in update.cfg.
+  * Fix error message on failing to download non-bzr seeds.
+  * Update kubuntu-meta example in germinate-update-metapackage(1).
+  * Simplify germinate-update-metapackage changelog output when a package
+    moves from depends to recommends or vice versa.
+  * Remove obsolete dh_python call from debian/rules.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 22 Feb 2008 17:54:28 +0000
+
+germinate (0.41) unstable; urgency=low
+
+  * Plant seeds in topologically-sorted order. The intent of this change is
+    the same as that in 0.40, only this time it should actually work in the
+    face of seeds that inherit from other seeds that are overridden in a
+    different branch.
+  * On the other hand, continue to use the last entry in the source
+    STRUCTURE file as the supported seed. It may not be topologically last
+    if there are seeds in included branches that are not inherited by
+    supported.
+  * Remove overridden entries from 'structure' output file.
+
+ -- Colin Watson <cjwatson@debian.org>  Mon, 18 Feb 2008 15:06:24 +0000
+
+germinate (0.40) unstable; urgency=low
+
+  * Fix ordering of seed planting in the event that a seed in an included
+    branch is overridden by one with different inheritance.
+
+ -- Colin Watson <cjwatson@debian.org>  Thu, 14 Feb 2008 18:33:25 +0000
+
+germinate (0.39) unstable; urgency=low
+
+  [ Jonathan Riddell ]
+  * Use 'bzr checkout --lightweight' to speed up seed checkouts.
+
+  [ Colin Watson ]
+  * Allow "metapackage_map/SEED" configuration file entries in
+    update-metapackage, which can be used to generate output metapackages
+    whose names do not match the generating seed names.
+
+ -- Colin Watson <cjwatson@debian.org>  Thu, 14 Feb 2008 14:38:56 +0000
+
+germinate (0.38) unstable; urgency=low
+
+  * Fix germination from multiple seed sources in bzr mode.
+  * germinate-update-metapackage now automatically expands the seeds option
+    for seed inheritance, so you no longer usually need to have separate
+    seeds and output_seeds options in update.cfg.
+
+ -- Colin Watson <cjwatson@debian.org>  Tue, 12 Feb 2008 11:30:53 +0000
+
+germinate (0.37) unstable; urgency=low
+
+  * Output a .seedtext file for each seed, containing the verbatim text of
+    the seed.
+
+ -- Colin Watson <cjwatson@debian.org>  Thu, 07 Feb 2008 11:30:39 +0000
+
+germinate (0.36) unstable; urgency=low
+
+  * Add special-case handling of supported+build-depends to
+    germinate-pkg-diff.
+  * Add -S/--seed-source, -s/--seed-dist, and -d/--dist options to
+    germinate-pkg-diff.
+  * Add support for germinating from multiple seed sources as well as
+    multiple branches. This is needed to support "third-party" seed branches
+    that are stored in a different location from branches they include.
+  * Fix rescuing of packages from extra, broken in 0.32.
+
+ -- Colin Watson <cjwatson@debian.org>  Tue, 29 Jan 2008 21:53:30 +0000
+
+germinate (0.35) unstable; urgency=low
+
+  * Make germinate-update-metapackage only blacklist the metapackage being
+    generated, not all metapackages. See LP #148075.
+  * Change default distribution to hardy.
+  * Vcs-Bzr is now an official field.
+  * Fix 'structure' output file; records were being separated by the empty
+    string rather than by newlines, which made it rather useless.
+  * Add an 'include' facility to the STRUCTURE file to allow seeds from one
+    branch to inherit from seeds in another branch.
+  * Automatically compute the transitive closure of inheritance
+    relationships in the STRUCTURE file, rather than requiring them to be
+    written out by hand. In other words, if you have 'minimal: required'
+    then you can simply write 'standard: minimal' rather than 'standard:
+    required minimal'. This is a requirement for sane use of 'include',
+    since it may not be straightforward to hardcode the inheritance
+    relationships among seeds in another branch.
+  * Unhardcode the 'supported' seed. The last seed in the STRUCTURE file is
+    now used for build-depends calculations.
+  * Policy version 3.7.3: no changes required.
+
+ -- Colin Watson <cjwatson@debian.org>  Thu, 24 Jan 2008 14:25:16 +0000
+
+germinate (0.34) unstable; urgency=low
+
+  * Follow Recommends in Section: metapackages as if they were Depends.
+  * Ignore leading and trailing whitespace and blank lines in STRUCTURE
+    files.
+  * Allow comments (starting with #) in STRUCTURE files.
+
+ -- Colin Watson <cjwatson@debian.org>  Thu, 02 Aug 2007 12:05:40 +0100
+
+germinate (0.33) unstable; urgency=low
+
+  * Honour recommends in germinate-pkg-diff.
+
+ -- Colin Watson <cjwatson@debian.org>  Thu, 19 Jul 2007 09:07:16 +0100
+
+germinate (0.32) unstable; urgency=low
+
+  * Use dch -iU rather than dch -U. (I use
+    DEBCHANGE_RELEASE_HEURISTIC=changelog so never noticed the problem.)
+  * Fix germinate-pkg-diff --mode option (was incorrectly --mirror, contrary
+    to its meaning and the documentation).
+  * Make germinate-pkg-diff work again even if supported is not in its list
+    of seeds.
+  * germinate-pkg-diff now automatically adds inherited seeds as necessary.
+    Thus, the default list of seeds is reduced to simply 'desktop'.
+  * Download package index files to a temporary directory if they aren't
+    going to be saved.
+  * Clean up package index files downloaded for germinate-pkg-diff.
+  * Add germinate-pkg-diff -a/--arch option.
+  * Update copyright dates.
+  * Add manual pages for germinate-pkg-diff and
+    germinate-update-metapackage.
+
+ -- Colin Watson <cjwatson@debian.org>  Wed, 18 Jul 2007 14:00:50 +0100
+
+germinate (0.31) unstable; urgency=low
+
+  * Fix excluding packages from seeds other than extra.
+
+ -- Colin Watson <cjwatson@debian.org>  Fri, 13 Jul 2007 10:08:24 +0100
+
+germinate (0.30) unstable; urgency=low
+
+  * Generalise Extra-Include and Extra-Exclude to allow rescuing packages
+    from any seed, not just extra. For example, Mobile-Include: *-dev will
+    rescue all packages from sources that generate binaries named *-dev in
+    the mobile output.
+
+ -- Colin Watson <cjwatson@debian.org>  Tue, 10 Jul 2007 17:43:30 +0100
+
+germinate (0.29) unstable; urgency=low
+
+  * Add Vcs-Bzr control field.
+  * Use dch -U if available.
+  * Document meaning of seed entries in parentheses.
+  * Remove old arch-tag lines.
+  * PEP-8 import ordering.
+  * Add --version option to all programs.
+
+ -- Colin Watson <cjwatson@debian.org>  Fri, 06 Jul 2007 12:26:52 +0100
+
+germinate (0.28) unstable; urgency=low
+
+  * Try to fall back to alternative dependencies if one is blacklisted.
+  * Honour blacklist entries even if they're explicitly seeded.
+  * Don't apply blacklists (apart from the "supported" blacklist) to
+    build-dependencies.
+  * Be a little more verbose when blacklisting packages.
+  * Allow "seed_map/SEED" configuration file entries in update-metapackage
+    to have an output metapackage read its package list from multiple seeds
+    (needed for splitting required and minimal in the Ubuntu seeds).
+
+ -- Colin Watson <cjwatson@debian.org>  Sat, 23 Jun 2007 20:56:11 +0100
+
+germinate (0.27) unstable; urgency=low
+
+  * Add support for negative architecture specifications, e.g. [!powerpc].
+  * Document % and [arch] seed syntaxes in germinate(1).
+  * Add support for prefixing seed entries with "!" to enforce blacklisting
+    packages from the containing seed and any of its inner seeds. For
+    example, this allows a package to be in Ubuntu main but blacklisted from
+    being shipped on CDs.
+  * Change default distribution to gutsy.
+
+ -- Colin Watson <cjwatson@debian.org>  Fri, 01 Jun 2007 12:54:27 +0100
+
+germinate (0.26) unstable; urgency=low
+
+  * Change default non-bzr seed location to
+    http://people.ubuntu.com/~ubuntu-archive/seeds/.
+
+ -- Colin Watson <cjwatson@debian.org>  Mon, 12 Mar 2007 12:01:14 +0000
+
+germinate (0.25) unstable; urgency=low
+
+  * Change default distribution to feisty.
+  * Fix file descriptor leak in Germinator.parseStructure().
+  * Put the contents of the STRUCTURE seed file in a new "structure" output
+    file.
+  * Change default seed distribution to "ubuntu.feisty"; note new naming
+    scheme.
+  * Fetch seeds from
+    http://bazaar.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/ by default if
+    the --bzr option is used.
+
+ -- Colin Watson <cjwatson@debian.org>  Tue, 12 Dec 2006 09:29:46 +0000
+
+germinate (0.24) unstable; urgency=low
+
+  * When processing whole-source seed entries, only include real packages.
+    This avoids slews of warnings for binaries that only exist on other
+    architectures, and avoids mistakenly picking up virtual packages.
+
+ -- Colin Watson <cjwatson@debian.org>  Tue,  3 Oct 2006 11:59:45 +0100
+
+germinate (0.23) unstable; urgency=low
+
+  * Fix recommends-related changelog entries from update-metapackage.
+
+ -- Colin Watson <cjwatson@debian.org>  Sat,  9 Sep 2006 18:44:37 +0100
+
+germinate (0.22) unstable; urgency=low
+
+  * Fix crash when promoting from lesser seeds.
+  * Include recommends in main outputs (they should continue to appear in
+    Task headers and such, just not in metapackage dependencies), and create
+    a .seed-recommends output for just the seeded recommendations.
+
+ -- Colin Watson <cjwatson@debian.org>  Sat,  9 Sep 2006 15:28:57 +0100
+
+germinate (0.21ubuntu1) edgy; urgency=low
+
+  * added support for recommends in seeds via enclosing the
+    packagename in '('..')'. E.g. 
+    * (pkgname)     # this will produce a recommends
+
+ -- Michael Vogt <michael.vogt@ubuntu.com>  Thu,  7 Sep 2006 16:44:36 +0200
+
+germinate (0.21) unstable; urgency=low
+
+  * Add optional output_seeds setting (defaults to value of seeds) in
+    update.cfg, to allow seeds to be germinated for inheritance purposes
+    without being output.
+  * Sort added and removed packages in metapackage changelogs.
+
+ -- Colin Watson <cjwatson@debian.org>  Mon,  7 Aug 2006 16:19:15 +0100
+
+germinate (0.20) unstable; urgency=low
+
+  * Consider sources from inner seeds while rescuing packages from extra (so
+    e.g. in Ubuntu Extra-Include in supported should look at source packages
+    from minimal etc. as well as from supported).
+  * Rescue from sources in the build tree in a separate pass, and add
+    rescued packages to the depends/build-depends lists rather than
+    pretending that they're explicitly seeded. This means that rescued
+    packages end up correctly in supported or supported+build-depends
+    depending on whether their source packages were found while processing
+    dependencies or build-dependencies.
+
+ -- Colin Watson <cjwatson@debian.org>  Wed,  5 Jul 2006 13:08:34 +0100
+
+germinate (0.19) unstable; urgency=low
+
+  * Allow shell-style globs in seeds wherever regular expressions are
+    allowed. (Regular expressions are surrounded by /.../, making this
+    unambiguous.)
+  * Add support for Extra-Include and Extra-Exclude variables, which allow
+    automatically rescuing packages that match certain patterns from extra
+    (https://launchpad.net/distros/ubuntu/+spec/seed-cleanup).
+  * Tweak logging priorities for messages about virtual seed entries.
+  * Don't display debugging messages by default; add germinate -v/--verbose
+    option to display them.
+  * Use sets rather than lists where possible. This roughly halves the
+    runtime for the Ubuntu seeds.
+  * Add extras recursively: binaries generated by sources pulled in by
+    dependencies or build-dependencies of extra binaries should themselves
+    be extra.
+
+ -- Colin Watson <cjwatson@debian.org>  Tue,  4 Jul 2006 11:57:47 +0100
+
+germinate (0.18) unstable; urgency=low
+
+  * Convert to python-support.
+  * Move python and python-support build-dependencies to
+    Build-Depends-Indep.
+  * Policy version 3.7.2.
+
+ -- Colin Watson <cjwatson@debian.org>  Sat,  1 Jul 2006 12:33:24 +0100
+
+germinate (0.17) unstable; urgency=low
+
+  * Fix d-i kernel version pruning to happen early enough to exclude seeded
+    packages for the wrong kernel version (which can easily happen e.g. if
+    regex seeds are used).
+  * If no Kernel-Version variable is given, allow all udebs with
+    Kernel-Version headers rather than none of them.
+  * Change default distribution to edgy.
+
+ -- Colin Watson <cjwatson@debian.org>  Wed, 21 Jun 2006 18:10:40 +0100
+
+germinate (0.16) unstable; urgency=low
+
+  * Add --bzr option to automatically check out seeds from bzr.
+  * Switch from urllib to urllib2.
+  * Refactor duplicated seed-fetching code into new Germinate.seeds module.
+  * Add optional seed_dist setting in update.cfg files, to allow setting a
+    default seed distribution.
+  * Add --bzr option to update-metapackage as well (mostly implementing
+    https://launchpad.net/distros/ubuntu/+spec/ubuntu-meta-from-bzr).
+
+ -- Colin Watson <cjwatson@debian.org>  Fri,  9 Jun 2006 12:15:01 +0100
+
+germinate (0.15) unstable; urgency=low
+
+  * Source moved to bzr; update copyright file.
+  * Add germinate-update-metapackage script to help manage updating
+    ubuntu-meta et al (thanks, Gustavo Franco; closes:
+    https://launchpad.net/bugs/37917).
+  * Improve man page documentation of --seed-packages slightly (see
+    #363536).
+
+ -- Colin Watson <cjwatson@debian.org>  Fri,  9 Jun 2006 01:04:21 +0100
+
+germinate (0.14) unstable; urgency=low
+
+  * Move Python modules to /usr/lib/germinate; .pyc/.pyo files are
+    architecture-dependent.
+
+ -- Colin Watson <cjwatson@debian.org>  Sat, 13 May 2006 10:05:37 +0100
+
+germinate (0.13) unstable; urgency=low
+
+  * Build-depend on python (closes: #363040).
+
+ -- Colin Watson <cjwatson@debian.org>  Mon, 17 Apr 2006 11:44:13 +0100
+
+germinate (0.12) unstable; urgency=low
+
+  * Upload to Debian (closes: #360631).
+  * Switch to my debian.org maintainer address.
+
+ -- Colin Watson <cjwatson@debian.org>  Mon,  3 Apr 2006 23:25:23 +0100
+
+germinate (0.11) dapper; urgency=low
+
+  * Fix plantSeed() backward incompatibility for *-meta/update scripts by
+    defaulting seedrelease to None.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 22 Feb 2006 15:56:35 +0000
+
+germinate (0.10) dapper; urgency=low
+
+  * Add seed distribution name to seed descriptions in the "Why" column.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 21 Feb 2006 18:07:16 +0000
+
+germinate (0.9) dapper; urgency=low
+
+  * When processing the build tree, germinate is (correctly) careful not to
+    promote packages from lesser seeds, since we still want to consider them
+    (e.g.) part of ship even if they're build-dependencies of desktop.
+    However, this sometimes caused us to select the wrong alternative from
+    an or-ed build-dependency (e.g. redland Build-Depends:
+    libmysqlclient15-dev | libmysqlclient12-dev | libmysqlclient10-dev and
+    libmysqlclient15-dev was in the Ubuntu supported seed). To fix this,
+    process the packages at that point anyway and just avoid promoting them.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Mon, 20 Feb 2006 13:51:30 +0000
+
+germinate (0.8) dapper; urgency=low
+
+  * When identifying extras, check for binaries built from multiple source
+    packages and skip any superseded binaries.
+  * Change default for --components to main and restricted, since the Ubuntu
+    seeds rely on packages from restricted in order to germinate correctly.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 14 Feb 2006 12:11:24 +0000
+
+germinate (0.7) dapper; urgency=low
+
+  * Depend on python-apt (thanks, Jani Monoses).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 29 Nov 2005 19:23:45 +0000
+
+germinate (0.6) dapper; urgency=low
+
+  * Add regular expression support in seeds. Weaken architecture
+    specification error checking in order to be able to use [...] in regular
+    expressions more easily.
+  * Add support for including all the binaries from a given source package
+    (using "%source") in seeds.
+  * Add germinate --cleanup option, to prevent caching of Packages and
+    Sources files.
+  * Add germinate --source-mirror option, to allow Packages and Sources
+    files to be on different mirrors (e.g. Ubuntu ports architectures).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 16 Nov 2005 14:37:37 +0000
+
+germinate (0.5) dapper; urgency=high
+
+  * Stop accidentally including extra in the all and supported+build-depends
+    outputs.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Sun, 30 Oct 2005 12:35:47 -0500
+
+germinate (0.4) dapper; urgency=low
+
+  * Don't attempt to satisfy versioned dependencies of .debs using virtual
+    packages, as the packaging toolchain doesn't support that. (udpkg/anna
+    do support this for .udebs, and the installer relies on that.)
+  * Change default distribution to dapper.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 25 Oct 2005 12:14:07 +0100
+
+germinate (0.3) breezy; urgency=low
+
+  * Add a man page for germinate.
+  * Explain in pkg-diff --help that you can supply a list of seeds to
+    compare against as non-option arguments.
+  * Update pkg-diff's default seeds to 'minimal standard desktop', to match
+    the breezy seeds.
+  * Add germinate --seed-packages option, to allow calculating dependencies
+    of individual extra packages during a germinate run.
+  * Policy version 3.6.2. No changes required.
+  * Update GPL notices with the FSF's new address.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 31 Aug 2005 18:47:20 +0100
+
+germinate (0.2) breezy; urgency=low
+
+  * Fix formatting of output lines with UTF-8 maintainer strings.
+  * Really pick the first reason from the build-dependency tree to display
+    in output files.
+  * Record allowed d-i kernel versions on a per-seed basis, so that we can
+    have some kernel versions supported for netboot installations only.
+  * Force a trailing slash onto the end of any --seed-source argument.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 26 May 2005 16:32:38 +0100
+
+germinate (0.1) breezy; urgency=low
+
+  * Initial release.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 27 Apr 2005 20:24:53 +1000

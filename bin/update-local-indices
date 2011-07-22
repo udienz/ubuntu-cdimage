@@ -1,0 +1,34 @@
+#! /bin/sh
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+[ -d "$CDIMAGE_ROOT/local/packages" ] || exit 0
+
+cd "$CDIMAGE_ROOT/local/packages"
+mkdir -p ../database/dists ../database/indices
+for arch in $CPUARCHES; do
+	> "../database/dists/${DIST}_local_binary-$arch.list"
+	> "../database/dists/${DIST}_local_debian-installer_binary-$arch.list"
+	> "../database/indices/override.$DIST.local.$arch"
+	> "../database/indices/override.$DIST.local.debian-installer.$arch"
+	for x in $(find pool/local -name "*_$arch.deb" -o -name '*_all.deb'); do
+		echo "$x" >> "../database/dists/${DIST}_local_binary-$arch.list"
+		name="${x##*/}"
+		name="${name%%_*}"
+		section="$(dpkg -f "$x" Section)"
+		section="${section##*/}"
+		priority="$(dpkg -f "$x" Priority)"
+		printf '%s\t%s\t%s\n' "$name" "$priority" "local/$section" >> "../database/indices/override.$DIST.local.$arch"
+	done
+	for x in $(find pool/local -name "*_$arch.udeb" -o -name '*_all.udeb'); do
+		echo "$x" >> "../database/dists/${DIST}_local_debian-installer_binary-$arch.list"
+		name="${x##*/}"
+		name="${name%%_*}"
+		priority="$(dpkg -f "$x" Priority)"
+		printf '%s\t%s\t%s\n' "$name" "$priority" "local/debian-installer" >> "../database/indices/override.$DIST.local.debian-installer.$arch"
+	done
+	mkdir -p "dists/$DIST/local/binary-$arch" \
+	         "dists/$DIST/local/debian-installer/binary-$arch"
+done
+apt-ftparchive generate apt-ftparchive.conf

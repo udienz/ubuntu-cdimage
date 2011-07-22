@@ -1,0 +1,47 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ]; then
+	echo 'Usage: find-mirror ARCH' >&2
+	exit 1
+fi
+ARCH="$1"
+
+if [ "$CDIMAGE_UNSUPPORTED" ]; then
+	echo "$CDIMAGE_ROOT/ftp-universe"
+	exit 0
+fi
+
+case ${ARCH%%+*} in
+	amd64|i386)
+		echo "$CDIMAGE_ROOT/ftp"
+		;;
+	powerpc)
+		# https://lists.ubuntu.com/archives/ubuntu-announce/2007-February/000098.html
+		if dist_le edgy; then
+			echo "$CDIMAGE_ROOT/ftp"
+		else
+			echo "$CDIMAGE_ROOT/ftp-ports"
+		fi
+		;;
+	sparc)
+		# https://lists.ubuntu.com/archives/ubuntu-devel-announce/2008-March/000400.html
+		if dist_ge dapper && dist_le gutsy; then
+			echo "$CDIMAGE_ROOT/ftp"
+		else
+			echo "$CDIMAGE_ROOT/ftp-ports"
+		fi
+		;;
+	armel|hppa|ia64|lpia)
+		echo "$CDIMAGE_ROOT/ftp-ports"
+		;;
+	*)
+		echo "No mirror known for $ARCH" >&2
+		exit 1
+		;;
+esac
+
+exit 0

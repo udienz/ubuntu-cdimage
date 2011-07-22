@@ -1,0 +1,6 @@
+# Install the Kubuntu desktop.
+tasksel	tasksel/first	multiselect kubuntu-desktop
+# Install KDE translation packages.
+d-i	pkgsel/language-pack-patterns	string language-pack-kde-$LL kde-i18n-$LL
+# Install the KDE oem-config frontend (if in OEM mode).
+d-i	oem-config-udeb/frontend	string kde

@@ -1,0 +1,12 @@
+# Always install the server kernel.
+d-i	base-installer/kernel/override-image	string linux-server
+# Don't install usplash.
+d-i	base-installer/kernel/linux/extra-packages-2.6	string
+# Desktop system not installed; don't waste time and disk space copying it.
+d-i	archive-copier/desktop-task	string ubuntu-standard
+d-i	archive-copier/ship-task	string
+# Only install the standard system and language packs.
+d-i	pkgsel/install-pattern	string ~t^ubuntu-standard$
+d-i	pkgsel/language-pack-patterns	string
+# No language support packages.
+d-i	pkgsel/install-language-support	boolean false

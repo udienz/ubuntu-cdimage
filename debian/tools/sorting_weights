@@ -1,0 +1,65 @@
+#! /bin/sh
+#
+# Create weighting files suitable for 'mkisofs -sort'.
+#
+# First argument = CD number
+# Subsequent arguments = files or directories to be sorted to the start
+# Note that these filenames are relative to $BDIR, not $BDIR/CD$CD.
+
+BDIR="$TDIR/$CODENAME-$FULLARCH"
+CD="$1"
+shift
+
+SECTIONS="main non-US/main"
+if [ "${CONTRIB:-0}" != 0 ]; then
+	SECTIONS="$SECTIONS contrib non-US/contrib"
+fi
+if [ "${NONFREE:-0}" != 0 ] || [ "${EXTRANONFREE:-0}" != 0 ]; then
+	SECTIONS="$SECTIONS non-free non-US/non-free"
+fi
+if [ "${RESTRICTED:-0}" != 0 ]; then
+	SECTIONS="$SECTIONS restricted non-US/restricted"
+fi
+if [ "${UNIVERSE:-0}" != 0 ]; then
+	SECTIONS="$SECTIONS universe non-US/universe"
+fi
+if [ "${MULTIVERSE:-0}" != 0 ]; then
+	SECTIONS="$SECTIONS multiverse non-US/multiverse"
+fi
+if [ "$LOCAL" ]; then
+	SECTIONS="$SECTIONS local"
+fi
+
+rm -f "$BDIR/$CD.weights_in" "$BDIR/$CD.weights"
+
+i="$#"
+for file in $@; do
+	# These files (or directories) sort before everything else.
+	echo "$file +$i" >> "$BDIR/$CD.weights"
+	i="$(($i - 1))"
+done
+
+for type in udeb deb; do
+	for section in $SECTIONS; do
+		if [ -s "$BDIR/$CD.filelist_$section" ]; then
+			grep "\\.$type\$" "$BDIR/$CD.filelist_$section" >> "$BDIR/$CD.weights_in"
+		fi
+	done
+done
+for file in ltsp/i386.img casper/filesystem.squashfs; do
+	if [ -e "$BDIR/CD$CD/$file" ]; then
+		echo "$file" >> "$BDIR/$CD.weights_in"
+	fi
+done
+
+weight=1
+
+while read file; do
+	# Use negative weight so that everything else sorts to the start
+	echo "CD$CD/$file -$weight"
+	weight="$(($weight + 1))"
+done < "$BDIR/$CD.weights_in" >> "$BDIR/$CD.weights"
+
+rm -f "$BDIR/$CD.weights_in"
+
+exit 0
