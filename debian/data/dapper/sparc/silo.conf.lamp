@@ -1,9 +1,0 @@
-
-# LAMP boots
-image[sun4u]=/boot/sparc64
-  label=lamp-server
-  append="${LAMP_PRESEED} --"
-
-image[sun4u]=/boot/sparc64
-  label=lamp-server-expert
-  append="${LAMP_PRESEED} DEBCONF_PRIORITY=low --"

@@ -1,4 +1,0 @@
-# Install the Xubuntu desktop.
-tasksel	tasksel/first	multiselect xubuntu-desktop
-# No XFCE translation packages yet.
-d-i	pkgsel/language-pack-patterns	string

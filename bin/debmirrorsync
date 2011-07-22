@@ -40,13 +40,13 @@ cd "$CDIMAGE_ROOT/log"
 # specification. If that's the case on your system, try using "0".
 #trap "rm -f $LOCK > /dev/null 2>&1" exit
 
-set +e
+#set +e
 
 debmirror -m --passive --nosource --host=$SRC --root=ubuntu \
 		--method=$METHOD --progress --dist=$DIST -section=$KOMPONEN \
 		--arch=$ARSITEKTUR $TO/ \
 		--exclude=-dbg_* \
-		--ignore-release-gpg > debmirror.log 2>&1
+		--ignore-release-gpg #> debmirror.log 2>&1
 
 # Make sure everything is group-writable etc. (the upstream mirror may have
 # too restrictive permissions, so umask doesn't help).
