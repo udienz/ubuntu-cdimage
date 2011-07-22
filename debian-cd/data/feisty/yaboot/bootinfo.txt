@@ -1,0 +1,5 @@
+<chrp-boot>
+<description>${CAPPROJECT} ${CODENAME} CD</description>
+<os-name>${CAPPROJECT}</os-name>
+<boot-script>boot &device;:\install\yaboot</boot-script>
+</chrp-boot>

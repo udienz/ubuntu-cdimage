@@ -1,0 +1,11 @@
+
+                       Welcome to Ubuntu ${DEBIAN_VERSION}!
+
+This is an Ubuntu live ${MEDIA_TYPE}, built on ${BUILD_DATE}.
+Keep it once you have installed your system, as you can boot from it
+to repair the system on your hard disk if that ever becomes necessary.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+[ ENTER - Boot live system ]

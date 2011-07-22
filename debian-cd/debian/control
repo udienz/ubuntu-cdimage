@@ -1,0 +1,18 @@
+Source: debian-cd
+Section: admin
+Priority: extra
+Maintainer: Debian CD Group <debian-cd@lists.debian.org>
+Uploaders: Raphael Hertzog <hertzog@debian.org>, Santiago Garcia Mantinan <manty@debian.org>, Steve McIntyre <93sam@debian.org>
+Build-Depends-Indep: debhelper (>= 4), sysutils
+Standards-Version: 3.6.1.0
+
+Package: debian-cd
+Architecture: all
+Depends: perl, cpp, libdigest-md5-perl, sysutils, apt (>= 0.3.11.1), make, mkisofs (>= 4:2.01+01a01-4ubuntu4) | mkhybrid, lynx, grep-dctrl, apt-utils (>= 0.5.4), debootstrap, bc
+Recommends: hfsutils, debianutils (>= 1.6), jigdo-file (>= 0.7.0)
+Suggests: palo (>= 0.94), binutils-multiarch, netpbm, syslinux
+Description: Tools for building (Official) Debian CD set
+ Debian-cd is the official tool for building Debian CD set since the potato
+ release. It was formerly called YACS (for Yet Another CD Script).
+ .
+ Its goal is to facilitate the creation of customized Debian CD set.

@@ -1,0 +1,6 @@
+# Only show Ubuntu Studio tasks, and default to installing the desktop.
+tasksel	tasksel/limit-tasks	string minimal, standard, ubuntustudio-audio, ubuntustudio-audio-plugins, ubuntustudio-desktop, ubuntustudio-graphics, ubuntustudio-video
+tasksel	tasksel/first	multiselect ubuntustudio-desktop
+tasksel	tasksel/first	seen false
+# Language support is expected to be missing.
+d-i	pkgsel/install-language-support	boolean false

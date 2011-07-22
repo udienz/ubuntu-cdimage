@@ -1,0 +1,181 @@
+#!/bin/bash
+#
+# Do install stuff for i386/mac, including making bootable CDs
+# Works with debian-installer
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+
+. $BASEDIR/tools/boot/$DI_CODENAME/common.sh
+
+set -e
+
+N=$1
+CDDIR=$2
+BOOTDIR=
+if [ "$DI_WWW_HOME" = "default" ];then
+   DI_WWW_HOME="http://people.debian.org/~joeyh/d-i/images/daily"
+fi
+if [ ! "$DI_DIST" ]; then
+   export DI_DIST="$DI_CODENAME"
+fi
+if [ -z "$DI_PATH" ]; then
+   DI_PATH="$($BASEDIR/tools/find-newest-installer)"
+fi
+
+default_preseed
+
+cd $CDDIR/..
+
+#
+# This script is called with $1 (now $N) as the CD to 
+# make bootable.  N may be in the form "n" or "n_NONUS"
+# There may be more than 4 disks...support extras.
+
+# Strip NONUS part of disk number
+# NN will be 1...N so it can be used as an index
+#
+NN=`echo $N | sed -e 's/_NONUS//'`
+
+# List of boot image for each CD
+KTYPE[1]="" #elilo multiboot in fact
+KTYPE[2]="cdrom"
+# XXX add net-image back when it's fixed
+KTYPE[3]=""
+KTYPE[4]=""
+KTYPE[5]=""
+KTYPE[6]=""
+KTYPE[7]=""
+KTYPE[8]=""
+KTYPE[9]=""
+KTYPE[10]=""
+
+THISTYPE=${KTYPE[$NN]}
+
+BOOT_IMAGES="udeb.list cdrom/initrd.gz cdrom/vmlinuz cdrom/debian-cd_info.tar.gz"
+DISK_IMAGES=""
+TAR_IMAGES="netboot/netboot.tar.gz"
+
+# Download boot images
+for image in $BOOT_IMAGES $DISK_IMAGES $TAR_IMAGES; do
+    if [ ! -e "$image" ]; then
+	dir=$(dirname $image)
+	mkdir -p $dir
+	if [ ! "$DI_WWW_HOME" ];then
+		cp "$DI_PATH/current/images/$image" "$image"
+	else
+		wget "$DI_WWW_HOME/$image" -O "$image"
+	fi
+    fi
+done
+
+if [ "$NN" = "1" ]; then
+    echo "Using elilo boot-disks image on CD$N"
+    mkdir -p boot$N/install
+    ELILODEB="$($BASEDIR/tools/apt-selection cache show elilo | \
+	grep ^Filename | awk '{print $2}')"
+    (ar p "$MIRROR/$ELILODEB" data.tar.gz | \
+	tar zxf - -C . ./usr/lib/elilo/elilo.efi)
+    mv usr/lib/elilo/elilo.efi boot$N/install/
+
+    rm -rf usr
+    if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+	cp -lf cdrom/vmlinuz $CDDIR/install/
+	cp -lf cdrom/initrd.gz $CDDIR/install/
+    fi
+    if [ "$CDIMAGE_LIVE" = 1 ]; then
+	mv $CDDIR/casper/filesystem.kernel-386 $CDDIR/casper/vmlinuz
+	mv $CDDIR/casper/filesystem.initrd-386 $CDDIR/casper/initrd.gz
+    fi
+    echo -n "-cache-inodes -J -l " > $N.mkisofs_opts
+    # HFS hybrid filesystem for booting on Intel-based Macs
+    echo -n "--netatalk -hfs -probe -map $BASEDIR/data/hfs.map " >> $N.mkisofs_opts
+    echo -n "-part -no-desktop -hfs-bless CD$N/install -hfs-bless-file CD$N/install/elilo.efi -hfs-volid ${CAPPROJECT}_i386_${CODENAME} " >> $N.mkisofs_opts
+    # Recommended size for an HFS catalog is 4 MB per GB, defaults to 4 MB
+    if [ "$SIZELIMIT1" ]; then
+	if [ "$SIZELIMIT1" -gt 1000000000 ]; then
+	    echo -n "-hfs-parms MAX_XTCSIZE=$(($SIZELIMIT1 / 256)) " >> $N.mkisofs_opts
+	fi
+    elif [ "$SIZELIMIT" ]; then
+	if [ "$SIZELIMIT" -gt 1000000000 ]; then
+	    echo -n "-hfs-parms MAX_XTCSIZE=$(($SIZELIMIT / 256)) " >> $N.mkisofs_opts
+	fi
+    elif [ "$DEFBINSIZE" ]; then
+	if [ "$DEFBINSIZE" -gt 1000 ]; then
+	    echo -n "-hfs-parms MAX_XTCSIZE=$(($DEFBINSIZE * 4096)) " >> $N.mkisofs_opts
+	fi
+    fi
+fi
+
+"$BASEDIR/tools/sorting_weights" "$N"
+echo -n "-sort $(pwd)/$N.weights " >> $N.mkisofs_opts
+
+#install_languages $CDDIR
+
+# Only disk one gets the extra files installed
+#
+if [ "$NN" = "1" ]; then
+
+
+# populate the install directory as well
+for disk in $DISK_IMAGES; do
+	dir=$(dirname $disk)
+	mkdir -p $CDDIR/install/$dir
+	cp -lf $disk $CDDIR/install/$dir
+done
+
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+	for tar in $TAR_IMAGES; do
+		dir=$(dirname $tar)
+		mkdir -p $CDDIR/install/$dir
+		tar -C $CDDIR/install/$dir -xzpf $tar
+	done
+fi
+
+# elilo setup
+
+# Extract memtest86+ from the archive
+MEMTEST86DEB="$($BASEDIR/tools/apt-selection cache show memtest86+ | \
+	grep ^Filename | awk '{print $2}')"
+ar p "$MIRROR/$MEMTEST86DEB" data.tar.gz | \
+	tar xzf - -C $CDDIR/install/ ./boot/memtest86+.bin
+mv $CDDIR/install/boot/memtest86+.bin $CDDIR/install/mt86plus
+rm -rf $CDDIR/install/boot
+# elilo help files come from d-i.
+cat cdrom/debian-cd_info.tar.gz | (cd boot$N/install/; tar zx)
+# Remove ISOLINUX configuration; only for non-Macs.
+rm -f boot$N/install/isolinux*
+rm -f boot$N/install/*.txt*
+rm -f boot$N/install/*.hlp*
+# Override splash screen.
+if [ "$SPLASHRLE" ] && [ -e "$SPLASHRLE" ]; then
+    cp -p "$SPLASHRLE" boot$N/install/splash.rle
+fi
+if [ "$GFXSPLASH" ] && [ -e "$GFXSPLASH" ]; then
+    cp -p "$GFXSPLASH" boot$N/install/splash.pcx
+fi
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+    rm -f boot$N/install/*.msg.live
+else
+    for x in boot$N/install/*.msg.live; do
+	[ -f "$x" ] || continue
+	mv "$x" "${x%.live}"
+    done
+    for x in boot$N/install/*.msg.live; do
+	[ -f "$x" ] || continue
+	mv "$x" "${x%.live}"
+    done
+fi
+
+fi
+
+# write final lines to mkisofs_opts
+if [ "$NN" = "1" ]; then
+    echo -n "boot$N " >> $N.mkisofs_opts
+else
+    if [ -n "$THISTYPE" ]; then
+	echo -n "-c boot/boot.catalog boot$N "  >> $N.mkisofs_opts
+    fi
+fi
+
+# th,th, thats all

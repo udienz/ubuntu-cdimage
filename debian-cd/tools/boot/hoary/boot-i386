@@ -1,0 +1,229 @@
+#!/bin/bash
+#
+# Do install stuff for i386, including making bootable CDs
+# Works with debian-installer
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+
+. $BASEDIR/tools/boot/$DI_CODENAME/common.sh
+
+set -e
+
+N=$1
+CDDIR=$2
+BOOTDIR=
+if [ "$DI_WWW_HOME" = "default" ];then
+   DI_WWW_HOME="http://people.debian.org/~joeyh/d-i/images/daily"
+fi
+if [ ! "$DI_DIST" ]; then
+   export DI_DIST="$DI_CODENAME"
+fi
+if [ -z "$DI_PATH" ]; then
+   DI_PATH="$($BASEDIR/tools/find-newest-installer)"
+fi
+
+case $PROJECT in
+    kubuntu)
+	DEFAULT_PRESEED='preseed/file=/cdrom/preseed/kubuntu.seed'
+	;;
+    *)
+	DEFAULT_PRESEED=
+	;;
+esac
+
+cd $CDDIR/..
+
+#
+# This script is called with $1 (now $N) as the CD to 
+# make bootable.  N may be in the form "n" or "n_NONUS"
+# There may be more than 4 disks...support extras.
+
+# Strip NONUS part of disk number
+# NN will be 1...N so it can be used as an index
+#
+NN=`echo $N | sed -e 's/_NONUS//'`
+
+# List of boot image for each CD
+KTYPE[1]="" #isolinux multiboot in fact
+KTYPE[2]="cdrom"
+# XXX add net-image back when it's fixed
+KTYPE[3]=""
+KTYPE[4]=""
+KTYPE[5]=""
+KTYPE[6]=""
+KTYPE[7]=""
+KTYPE[8]=""
+KTYPE[9]=""
+KTYPE[10]=""
+
+THISTYPE=${KTYPE[$NN]}
+
+BOOT_IMAGES="cdrom/initrd.gz cdrom/initrd.list cdrom/vmlinuz cdrom/debian-cd_info.tar.gz"
+DISK_IMAGES=""
+TAR_IMAGES="netboot/netboot.tar.gz"
+
+# Download boot images
+for image in $BOOT_IMAGES $DISK_IMAGES $TAR_IMAGES; do
+    if [ ! -e "$image" ]; then
+	dir=$(dirname $image)
+	mkdir -p $dir
+	if [ ! "$DI_WWW_HOME" ];then
+		cp "$DI_PATH/current/images/$image" "$image"
+	else
+		wget "$DI_WWW_HOME/$image" -O "$image"
+	fi
+    fi
+done
+
+if [ "$NN" = "1" ]; then
+    echo "Using ISOLINUX boot-disks image on CD$N"
+    mkdir -p boot$N/isolinux
+    cp -f $BASEDIR/data/$DI_CODENAME/isolinux.bin boot$N/isolinux/
+    cp -lf cdrom/vmlinuz $CDDIR/install/
+    cp -lf cdrom/initrd.gz $CDDIR/install/
+    cp -lf cdrom/initrd.list $CDDIR/install/
+    echo -n "-cache-inodes -J -l -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table " > $N.mkisofs_opts
+else
+    if [ -n "$THISTYPE" ]; then
+	echo "Using $THISTYPE boot-disks image on CD$N"
+	mkdir -p boot$N/boot
+	cp $THISTYPE/boot.img boot$N/boot/
+	echo -n "-cache-inodes -J -l -b boot/boot.img "  > $N.mkisofs_opts
+    else
+	mkdir boot$N
+	echo -n "-cache-inodes -J -l " > $N.mkisofs_opts
+    fi
+fi
+
+"$BASEDIR/tools/sorting_weights" "$N"
+echo -n "-sort $(pwd)/$N.weights " >> $N.mkisofs_opts
+
+#install_languages $CDDIR
+
+# Only disk one gets the extra files installed
+#
+if [ "$NN" = "1" ]; then
+
+
+# populate the install directory as well
+for disk in $DISK_IMAGES; do
+	dir=$(dirname $disk)
+	mkdir -p $CDDIR/install/$dir
+	cp -lf $disk $CDDIR/install/$dir
+done
+
+for tar in $TAR_IMAGES; do
+	dir=$(dirname $tar)
+	mkdir -p $CDDIR/install/$dir
+	tar -C $CDDIR/install/$dir -xzpf $tar
+done
+
+# ISOLINUX setup
+
+# Include Smart Boot Manager image for people where isolinux fails
+gzip -dc $BASEDIR/data/$DI_CODENAME/sbm.bin.gz > $CDDIR/install/sbm.bin
+# Keep the original file timestamp
+touch -r $BASEDIR/data/$DI_CODENAME/sbm.bin.gz $CDDIR/install/sbm.bin
+cp -p $BASEDIR/data/$DI_CODENAME/README.sbm $CDDIR/install/
+# Isolinux help files come from d-i.
+cat cdrom/debian-cd_info.tar.gz | (cd boot$N/isolinux/; tar zx)
+# Override splash screen.
+if [ "$SPLASHRLE" ] && [ -e "$SPLASHRLE" ]; then
+    cp -p "$SPLASHRLE" boot$N/isolinux/splash.rle
+fi
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+    rm -f boot$N/isolinux/*.txt.live
+else
+    for x in boot$N/isolinux/*.txt.live; do
+	mv "$x" "${x%.live}"
+    done
+fi
+if [ "$CDIMAGE_DVD" = 1 ]; then
+    # overrides; these should go in debian-installer instead
+    for x in $BASEDIR/data/$DI_CODENAME/isolinux/*.txt.dvd; do
+	base="${x##*/}"
+	cp -p "$x" "boot$N/isolinux/${base%.dvd}"
+    done
+fi
+sed -e "s#Ubuntu#$CAPPROJECT#g" boot$N/isolinux/syslinux.txt \
+    > boot$N/isolinux/isolinux.txt
+rm -f boot$N/isolinux/syslinux.txt
+# Isolinux config file.
+cat > boot$N/isolinux/isolinux.cfg <<EOF
+DEFAULT /install/vmlinuz
+EOF
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+    cat >> boot$N/isolinux/isolinux.cfg <<EOF
+APPEND $KERNEL_PARAMS $DEFAULT_PRESEED vga=normal initrd=/install/initrd.gz ramdisk_size=12288 root=/dev/rd/0 rw --
+LABEL install
+  kernel /install/vmlinuz
+LABEL linux
+  kernel /install/vmlinuz
+LABEL cdrom
+  kernel /install/vmlinuz
+LABEL expert
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED DEBCONF_PRIORITY=low vga=normal initrd=/install/initrd.gz ramdisk_size=12288 root=/dev/rd/0 rw --
+LABEL server
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS preseed/file=/cdrom/preseed/server.seed vga=normal initrd=/install/initrd.gz ramdisk_size=12288 root=/dev/rd/0 rw --
+LABEL server-expert
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS preseed/file=/cdrom/preseed/server.seed DEBCONF_PRIORITY=low vga=normal initrd=/install/initrd.gz ramdisk_size=12288 root=/dev/rd/0 rw --
+LABEL rescue
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS rescue/enable=true vga=normal initrd=/install/initrd.gz ramdisk_size=12288 root=/dev/rd/0 rw --
+LABEL multiseat
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED anna/choose_modules=multiseat-udeb vga=normal initrd=/install/initrd.gz ramdisk_size=12288 root=/dev/rd/0 rw --
+EOF
+fi
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    if [ "$CDIMAGE_INSTALL" != 1 ]; then
+	cat >> boot$N/isolinux/isolinux.cfg <<EOF
+APPEND $KERNEL_PARAMS casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop vga=normal initrd=/install/initrd.gz ramdisk_size=1048576 root=/dev/rd/0 rw --
+EOF
+    fi
+    cat >> boot$N/isolinux/isolinux.cfg <<EOF
+LABEL live
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop vga=normal initrd=/install/initrd.gz ramdisk_size=1048576 root=/dev/rd/0 rw --
+LABEL live-expert
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS DEBCONF_PRIORITY=low casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop vga=normal initrd=/install/initrd.gz ramdisk_size=1048576 root=/dev/rd/0 rw --
+EOF
+fi
+cat >> boot$N/isolinux/isolinux.cfg <<EOF
+DISPLAY isolinux.txt
+TIMEOUT 0
+PROMPT 1
+F1 f1.txt
+F2 f2.txt
+F3 f3.txt
+F4 f4.txt
+F5 f5.txt
+F6 f6.txt
+F7 f7.txt
+F8 f8.txt
+F9 f9.txt
+F0 f10.txt
+EOF
+
+mkdir -p $CDDIR/tools
+(echo "Tools for DOS :" ; \
+	echo "rawrite2/       rawrite 2.0 : create disks from disk images (*.bin)"; \
+	) |todos > $CDDIR/tools/README.tools
+
+fi
+
+# write final lines to mkisofs_opts
+if [ "$NN" = "1" ]; then
+    echo -n "boot$N " >> $N.mkisofs_opts
+else
+    if [ -n "$THISTYPE" ]; then
+	echo -n "-c boot/boot.catalog boot$N "  >> $N.mkisofs_opts
+    fi
+fi
+
+# th,th, thats all

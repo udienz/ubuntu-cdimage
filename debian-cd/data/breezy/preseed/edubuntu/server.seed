@@ -1,0 +1,14 @@
+# Adjust the default hostname.
+d-i	netcfg/get_hostname	string edubuntu
+# Don't install usplash.
+d-i	base-installer/kernel/linux/extra-packages-2.6	string
+# Desktop system not installed; don't waste time and disk space copying it.
+d-i	archive-copier/desktop-task	string edubuntu-standard
+d-i	archive-copier/ship-task	string
+# Don't build an LTSP client chroot.
+d-i	ltsp-client-builder/run	boolean false
+# Only install the standard system and language packs in the second stage.
+base-config	base-config/package-selection	string ~tedubuntu-standard
+base-config	base-config/language-pack-patterns	string language-pack-$LL
+# No language support packages.
+base-config	base-config/install-language-support	boolean false

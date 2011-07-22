@@ -119,7 +119,7 @@ if [ -z "$CDIMAGE_NOSYNC" ]; then
 			exit 1
 		fi
 		push_cleanup "rm -f $SYNC_LOCK"
-		anonftpsync
+		debmirrorsync #anonftpsync
 		ARCHES_COLONS="$(echo "$CPUARCHES" | tr ' ' ':')"
 		if [ "$CDIMAGE_UNSUPPORTED" ]; then
 			ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.universe" anonftpsync

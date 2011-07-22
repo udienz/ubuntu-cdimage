@@ -1,0 +1,47 @@
+
+# Powerpc subarch 
+image=/install/powerpc/vmlinux
+	label=live-powerpc
+	alias=live
+	initrd=/install/powerpc/initrd.gz
+	append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop --"
+	initrd-size=1048576
+	read-only
+
+image=/install/powerpc/vmlinux
+	label=live-expert-powerpc
+	alias=live-expert
+	initrd=/install/powerpc/initrd.gz
+	append="DEBCONF_PRIORITY=low casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop --"
+	initrd-size=1048576
+	read-only
+
+# Power3 subarch
+image=/install/power3/vmlinux
+	label=live-power3
+	initrd=/install/power3/initrd.gz
+	append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop --"
+	initrd-size=1048576
+	read-only
+
+image=/install/power3/vmlinux
+	label=live-expert-power3
+	initrd=/install/power3/initrd.gz
+	append="DEBCONF_PRIORITY=low casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop --"
+	initrd-size=1048576
+	read-only
+
+# Power 4 subarch
+image=/install/power4/vmlinux
+	label=live-power4
+	initrd=/install/power4/initrd.gz
+	append="casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop --"
+	initrd-size=1048576
+	read-only
+
+image=/install/power4/vmlinux
+	label=live-expert-power4
+	initrd=/install/power4/initrd.gz
+	append="DEBCONF_PRIORITY=low casper/enable=true casper-udeb/snapshot/backing-file=/cdrom/casper/filesystem.cloop --"
+	initrd-size=1048576
+	read-only

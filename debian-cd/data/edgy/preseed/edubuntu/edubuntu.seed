@@ -1,0 +1,11 @@
+# Adjust the default hostname.
+d-i	netcfg/get_hostname	string edubuntu
+d-i	netcfg/get_hostname	seen false
+# Build an LTSP client chroot.
+d-i	ltsp-client-builder/run	boolean true
+# Install the Edubuntu desktop and server.
+tasksel	tasksel/first	multiselect edubuntu-desktop, edubuntu-server
+# Install both GNOME and KDE translation packages.
+d-i	pkgsel/language-pack-patterns	string language-pack-gnome-$LL language-pack-kde-$LL kde-i18n-$LL
+# Build a client chroot.
+d-i	preseed/late_command	string chroot /target /usr/sbin/ltsp-update-sshkeys

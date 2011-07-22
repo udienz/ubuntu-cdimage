@@ -1,0 +1,53 @@
+#!/bin/sh
+
+set -e
+
+if [ $# != 1 ]; then
+    cat << EOF
+Usage: pi-makelist-vfat image.img >image.list
+
+Outputs list of files in a VFAT or in the VFAT of the second partition
+EOF
+    exit 1
+fi
+IMG="$1"
+
+MTOOLSRC=""
+cleanup() {
+    if [ -n "$MTOOLSRC" ]; then
+        rm -f "$MTOOLSRC"
+    fi
+}
+trap "cleanup" 0 1 2 3 9 11 13 15
+export MTOOLSRC=`tempfile --prefix pimkl --mode 644`
+
+# will try both of C: and D:
+cat >$MTOOLSRC <<EOF
+drive c:
+  file="$IMG"
+
+drive d:
+  file="$IMG"
+  partition=1
+
+drive e:
+  file="$IMG"
+  partition=2
+EOF
+
+ARGS="-/ -f -a -b"
+
+drive=""
+for d in "c:" "d:" "e:"; do
+    if mdir "$d" $ARGS >/dev/null 2>&1; then
+        drive="$d"
+        break
+    fi
+done
+
+if [ -z "$drive" ]; then
+    echo "$0: Couldn't list any drive" >&2
+    exit 1
+fi
+
+mdir "$drive" $ARGS | sed '/\/$/ d; s/^[CDE]://'

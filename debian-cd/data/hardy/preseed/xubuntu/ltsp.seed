@@ -1,0 +1,12 @@
+# Build an LTSP client chroot.
+d-i	ltsp-client-builder/run	boolean true
+d-i	ltsp-client-builder/build-client-opts	string --mirror file:///cdrom --security-mirror none --skipimage --components main,restricted,universe
+# Install the Xubuntu desktop and LTSP server.
+tasksel	tasksel/first	multiselect xubuntu-desktop
+d-i	pkgsel/include	string ltsp-server-standalone openssh-server
+# No XFCE translation packages yet.
+d-i	pkgsel/language-pack-patterns	string
+# Language support is expected to be missing.
+d-i	pkgsel/install-language-support	boolean false
+# Build a client chroot.
+d-i	preseed/late_command	string chroot /target /usr/sbin/ltsp-update-sshkeys

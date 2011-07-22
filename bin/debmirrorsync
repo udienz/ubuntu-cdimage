@@ -1,0 +1,61 @@
+#! /bin/sh
+set -e
+
+#
+# Skrip untuk mengambil paket menggunakan debmirror (sebagai alternatif lain
+# dari rsync).
+#
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+. "$CDIMAGE_ROOT/etc/debmirror"
+
+# TO is the destination for the base of the Debian mirror directory
+# (the dir that holds dists/ and ls-lR).
+
+TO="$CDIMAGE_ROOT/ftp"
+
+# Note: on some non-Debian systems, hostname doesn't accept -f option.
+# If that's the case on your system, make sure hostname prints the full
+# hostname, and remove the -f option. If there's no hostname command,
+# explicitly replace `hostname -f` with the hostname.
+HOSTNAME=`hostname -f`
+
+LOCK="${TO}/Archive-Update-in-Progress-${HOSTNAME}"
+
+if [ ! -d $TO ]; then
+mkdir -p "$TO"
+fi
+
+# Get in the right directory
+mkdir -p "$CDIMAGE_ROOT/log"
+cd "$CDIMAGE_ROOT/log"
+
+# Check to see if another sync is in progress
+#if lockfile -! -l 43200 -r 0 "$LOCK"; then
+#  echo ${HOSTNAME} is unable to start debmirror, lock file exists
+#  exit 1
+#fi
+# Note: on some non-Debian systems, trap doesn't accept "exit" as signal
+# specification. If that's the case on your system, try using "0".
+#trap "rm -f $LOCK > /dev/null 2>&1" exit
+
+set +e
+
+debmirror -m --passive --nosource --host=$SRC --root=ubuntu \
+		--method=$METHOD --progress --dist=$DIST -section=$KOMPONEN \
+		--arch=$ARSITEKTUR $TO/ \
+		--exclude=-dbg_* \
+		--ignore-release-gpg > debmirror.log 2>&1
+
+# Make sure everything is group-writable etc. (the upstream mirror may have
+# too restrictive permissions, so umask doesn't help).
+find "$TO" -type d -print0 | xargs -0r chmod g+s 2>/dev/null || true
+chmod -R g+rwX "$TO" 2>/dev/null || true
+
+mkdir -p "${TO}/project/trace"
+date -u > "${TO}/project/trace/${HOSTNAME}"
+
+# Note: if you don't have savelog, use any other log rotation facility, or
+# comment this out, the log will simply be overwritten each time.
+savelog debmirror.log > /dev/null 2>&1

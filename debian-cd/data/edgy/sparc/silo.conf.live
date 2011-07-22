@@ -1,0 +1,17 @@
+partition=1
+timeout=600
+message=/boot/ubuntu.txt
+default=live
+initrd=/casper/initrd.gz
+initrd-size=1048576
+root=/dev/ram
+
+# Standard boot images
+image[sun4u]=/casper/sparc64
+  label=live
+  append="${DEFAULT_PRESEED} boot=casper quiet --"
+
+# Media integrity check
+image[sun4u]=/casper/sparc64
+  label=check
+  append="boot=casper integrity-check quiet --"

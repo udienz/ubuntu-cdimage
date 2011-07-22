@@ -1,0 +1,46 @@
+
+# PowerPC subarch 
+image=/install/powerpc/vmlinux
+	label=install
+	alias=install-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="${DEFAULT_PRESEED} quiet --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc/vmlinux
+	label=expert
+	alias=expert-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="${DEFAULT_PRESEED} priority=low --"
+	initrd-size=8192
+	read-only
+
+# PowerPC64 subarch
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=install
+	initrd=/install/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} quiet --"
+	initrd-size=8192
+	read-only
+
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=expert
+	initrd=/install/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} priority=low --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=install-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} quiet --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=expert-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="${DEFAULT_PRESEED} priority=low --"
+	initrd-size=8192
+	read-only

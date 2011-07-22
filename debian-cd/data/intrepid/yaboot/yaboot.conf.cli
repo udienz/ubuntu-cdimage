@@ -1,0 +1,46 @@
+
+# PowerPC subarch 
+image=/install/powerpc/vmlinux
+	label=cli
+	alias=cli-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="file=/cdrom/preseed/cli.seed --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc/vmlinux
+	label=cli-expert
+	alias=cli-expert-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="file=/cdrom/preseed/cli.seed priority=low --"
+	initrd-size=8192
+	read-only
+
+# PowerPC64 subarch
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=cli
+	initrd=/install/powerpc64/initrd.gz
+	append="file=/cdrom/preseed/cli.seed --"
+	initrd-size=8192
+	read-only
+
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=cli-expert
+	initrd=/install/powerpc64/initrd.gz
+	append="file=/cdrom/preseed/cli.seed priority=low --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=cli-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="file=/cdrom/preseed/cli.seed --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=cli-expert-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="file=/cdrom/preseed/cli.seed priority=low --"
+	initrd-size=8192
+	read-only

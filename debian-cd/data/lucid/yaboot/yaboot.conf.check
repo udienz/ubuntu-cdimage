@@ -1,0 +1,24 @@
+
+# PowerPC subarch
+image=/install/powerpc/vmlinux
+	label=check
+	alias=check-powerpc
+	initrd=/install/powerpc/initrd.gz
+	append="MENU=/bin/cdrom-checker-menu --"
+	initrd-size=8192
+	read-only
+
+# PowerPC64 subarch
+image[macrisc4]=/install/powerpc64/vmlinux
+	label=check
+	initrd=/install/powerpc64/initrd.gz
+	append="MENU=/bin/cdrom-checker-menu --"
+	initrd-size=8192
+	read-only
+
+image=/install/powerpc64/vmlinux
+	label=check-powerpc64
+	initrd=/install/powerpc64/initrd.gz
+	append="MENU=/bin/cdrom-checker-menu --"
+	initrd-size=8192
+	read-only

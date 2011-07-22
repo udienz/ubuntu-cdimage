@@ -1,0 +1,2 @@
+# Only show Ubuntu Studio tasks.
+tasksel	tasksel/limit-tasks	string ubuntustudio-audio, ubuntustudio-audio-plugins, ubuntustudio-desktop, ubuntustudio-graphics, ubuntustudio-video

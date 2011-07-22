@@ -1,0 +1,2 @@
+# Install the Ubuntu desktop.
+tasksel	tasksel/first	multiselect ubuntu-desktop

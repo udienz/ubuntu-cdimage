@@ -1,0 +1,487 @@
+#!/bin/bash
+#
+# Do install stuff for i386, including making bootable CDs
+# Works with debian-installer
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+
+. $BASEDIR/tools/boot/$DI_CODENAME/common.sh
+
+set -e
+
+N=$1
+CDDIR=$2
+BOOTDIR=
+if [ "$DI_WWW_HOME" = "default" ];then
+   DI_WWW_HOME="http://people.debian.org/~joeyh/d-i/images/daily"
+fi
+if [ ! "$DI_DIST" ]; then
+   export DI_DIST="$DI_CODENAME"
+fi
+if [ -z "$DI_PATH" ]; then
+   DI_PATH="$($BASEDIR/tools/find-newest-installer)"
+fi
+
+default_preseed
+
+cd $CDDIR/..
+
+#
+# This script is called with $1 (now $N) as the CD to
+# make bootable.  N may be in the form "n" or "n_NONUS"
+# There may be more than 4 disks...support extras.
+
+# Strip NONUS part of disk number
+# NN will be 1...N so it can be used as an index
+#
+NN=`echo $N | sed -e 's/_NONUS//'`
+
+if [ "$CDIMAGE_ADDON" ]; then
+    # second disk, at least in spirit
+    NN=2
+fi
+
+# List of boot image for each CD
+KTYPE[1]="" #isolinux multiboot in fact
+KTYPE[2]=""
+# XXX add net-image back when it's fixed
+KTYPE[3]=""
+KTYPE[4]=""
+KTYPE[5]=""
+KTYPE[6]=""
+KTYPE[7]=""
+KTYPE[8]=""
+KTYPE[9]=""
+KTYPE[10]=""
+
+THISTYPE=${KTYPE[$NN]}
+
+BOOT_IMAGES="cdrom/initrd.gz cdrom/vmlinuz cdrom/debian-cd_info.tar.gz"
+DISK_IMAGES=""
+TAR_IMAGES="netboot/netboot.tar.gz"
+
+if [ "$CDIMAGE_DVD" = 1 ]; then
+    BOOT_IMAGES="$BOOT_IMAGES maverick-cdrom/initrd.gz maverick-cdrom/vmlinuz"
+    TAR_IMAGE="$TAR_IMAGES maverick-netboot/netboot.tar.gz"
+fi
+
+# Download boot images
+for image in MANIFEST.udebs $BOOT_IMAGES $DISK_IMAGES $TAR_IMAGES; do
+    if [ ! -e "$image" ]; then
+	dir=$(dirname $image)
+	mkdir -p $dir
+	if [ ! "$DI_WWW_HOME" ];then
+		cp "$DI_PATH/current/images/$image" "$image"
+	else
+		wget "$DI_WWW_HOME/$image" -O "$image"
+	fi
+    fi
+done
+
+if [ "$NN" = "1" ]; then
+    list_kernel_abis $BOOT_IMAGES | check_kernel_sync generic
+
+    echo "Using ISOLINUX boot-disks image on CD$N"
+    mkdir -p boot$N/isolinux
+    SYSLINUXDEB="$($BASEDIR/tools/apt-selection cache show syslinux | \
+	grep ^Filename | awk '{print $2}')"
+    (ar p "$MIRROR/$SYSLINUXDEB" data.tar.gz | \
+	tar zxf - -C . ./usr/lib/syslinux/isolinux.bin \
+	    ./usr/lib/syslinux/vesamenu.c32)
+    mv usr/lib/syslinux/isolinux.bin boot$N/isolinux/
+    mv usr/lib/syslinux/vesamenu.c32 boot$N/isolinux/
+
+    GFXBOOT=
+    if THEMEDEB="$($BASEDIR/tools/apt-selection cache show gfxboot-theme-ubuntu)"; then
+	THEMEDEB="$(echo "$THEMEDEB" | grep ^Filename | awk '{print $2}')"
+	ar p "$MIRROR/$THEMEDEB" data.tar.gz | tar zxf - -C . ./usr/share/gfxboot-theme-ubuntu/bootlogo.tar.gz
+	tar zxf usr/share/gfxboot-theme-ubuntu/bootlogo.tar.gz -C boot$N/isolinux
+	GFXBOOT=1
+    fi
+
+    rm -rf usr
+    if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+	cp -lf cdrom/vmlinuz $CDDIR/install/
+	cp -lf cdrom/initrd.gz $CDDIR/install/
+	if [ -d maverick-cdrom ]; then
+	    mkdir -p $CDDIR/install/maverick
+	    cp -lf maverick-cdrom/vmlinuz $CDDIR/install/maverick/
+	    cp -lr maverick-cdrom/initrd.gz $CDDIR/install/maverick/
+	fi
+    fi
+    if [ "$CDIMAGE_LIVE" = 1 ]; then
+	mv $CDDIR/casper/filesystem.kernel-generic $CDDIR/casper/vmlinuz
+	CASPER_INITRD="/casper/initrd$(initrd_suffix "$CDDIR/casper/filesystem.initrd-generic")"
+	mv $CDDIR/casper/filesystem.initrd-generic "$CDDIR$CASPER_INITRD"
+    fi
+    echo -n "-cache-inodes -J -l -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table " > $N.mkisofs_opts
+    # linux-backports-modules-compat-wireless-2.6.34-2.6.32-28-generic and
+    # linux-backports-modules-compat-wireless-2.6.34-2.6.32-28-generic-pae
+    # are indistinguishable without -joliet-long.
+    echo -n "-joliet-long " >> $N.mkisofs_opts
+else
+    if [ -n "$THISTYPE" ]; then
+	echo "Using $THISTYPE boot-disks image on CD$N"
+	mkdir -p boot$N/boot
+	cp $THISTYPE/boot.img boot$N/boot/
+	echo -n "-cache-inodes -J -l -b boot/boot.img "  > $N.mkisofs_opts
+    else
+	mkdir boot$N
+	echo -n "-cache-inodes -J -l " > $N.mkisofs_opts
+    fi
+fi
+
+"$BASEDIR/tools/sorting_weights" "$N" boot$N/isolinux/isolinux.bin boot$N/isolinux/boot.cat
+echo -n "-sort $(pwd)/$N.weights " >> $N.mkisofs_opts
+
+#install_languages $CDDIR
+
+# Only disk one gets the extra files installed
+#
+if [ "$NN" = "1" ]; then
+
+
+HIDDEN_TIMEOUT=
+if [ "$CDIMAGE_LIVE" = 1 ] && [ "$CDIMAGE_DVD" != 1 ]; then
+    if [ "$PROJECT" = ubuntu ] || [ "$PROJECT" = ubuntu-netbook ]; then
+	HIDDEN_TIMEOUT=2
+    elif [ "$PROJECT" = mythbuntu ]; then
+	HIDDEN_TIMEOUT=1
+    fi
+    ACCESSPCX=access-new.pcx
+fi
+
+# populate the install directory as well
+for disk in $DISK_IMAGES; do
+	dir=$(dirname $disk)
+	mkdir -p $CDDIR/install/$dir
+	cp -lf $disk $CDDIR/install/$dir
+done
+
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+	for tar in $TAR_IMAGES; do
+		dir=$(dirname $tar | sed 's,^maverick-,maverick/,')
+		mkdir -p $CDDIR/install/$dir
+		tar -C $CDDIR/install/$dir -xzpf $tar
+	done
+fi
+
+# ISOLINUX setup
+
+# Include Smart Boot Manager image for people where isolinux fails
+gzip -dc $BASEDIR/data/$DI_CODENAME/sbm.bin.gz > $CDDIR/install/sbm.bin
+# Keep the original file timestamp
+touch -r $BASEDIR/data/$DI_CODENAME/sbm.bin.gz $CDDIR/install/sbm.bin
+cp -p $BASEDIR/data/$DI_CODENAME/README.sbm $CDDIR/install/
+# Extract memtest86+ from the archive
+MEMTEST86DEB="$($BASEDIR/tools/apt-selection cache show memtest86+ | \
+	grep ^Filename | awk '{print $2}')"
+ar p "$MIRROR/$MEMTEST86DEB" data.tar.gz | \
+	tar xzf - -C $CDDIR/install/ ./boot/memtest86+.bin
+mv $CDDIR/install/boot/memtest86+.bin $CDDIR/install/mt86plus
+rm -rf $CDDIR/install/boot
+# Isolinux help files come from d-i.
+cat cdrom/debian-cd_info.tar.gz | (cd boot$N/isolinux/; tar zx)
+# Override splash screen.
+if [ "$SPLASHRLE" ] && [ -e "$SPLASHRLE" ]; then
+    cp -p "$SPLASHRLE" boot$N/isolinux/splash.rle
+fi
+if [ "$GFXSPLASH" ] && [ -e "$GFXSPLASH" ]; then
+    cp -p "$GFXSPLASH" boot$N/isolinux/splash.pcx
+fi
+if [ "$SPLASHPNG" ] && [ -e "$SPLASHPNG" ]; then
+    cp -p "$SPLASHPNG" boot$N/isolinux/splash.png
+fi
+if [ "$HIDDEN_TIMEOUT" ] && [ "$ACCESSPCX" ]; then
+    cp -p "$BASEDIR/data/$DI_CODENAME/$ACCESSPCX" boot$N/isolinux/access.pcx
+fi
+if [ "$HIDDEN_TIMEOUT" = 2 ]; then
+    cp -p "$BASEDIR/data/$DI_CODENAME/blank.pcx" boot$N/isolinux/blank.pcx
+fi
+# Remove elilo configuration; only for Macs.
+rm -f boot$N/isolinux/elilo*
+rm -f boot$N/isolinux/*.msg*
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+    rm -f boot$N/isolinux/*.txt.live
+    rm -f boot$N/isolinux/*.hlp.live
+else
+    for x in boot$N/isolinux/*.txt.live; do
+	[ -f "$x" ] || continue
+	mv "$x" "${x%.live}"
+    done
+    for x in boot$N/isolinux/*.hlp.live; do
+	[ -f "$x" ] || continue
+	mv "$x" "${x%.live}"
+    done
+fi
+# Nuke the GTK menu items for now.
+rm -f boot$N/isolinux/*gtk.cfg
+rm -f boot$N/isolinux/*.txt.withgtk
+
+# Set up-to-date build dates. Kludgy because d-i sets its own version as
+# the build date.
+DI_VERSION="$(perl -lne 'if (/built on ([0-9a-z]*)/) { print $1 }' \
+			"boot$N/isolinux/f1.txt")"
+if [ "$DI_VERSION" ]; then
+    : "${CDIMAGE_DATE:=$(date +%Y%m%d)}"
+    sed -i "s/$DI_VERSION/$CDIMAGE_DATE/g" \
+	"boot$N"/isolinux/*.txt "boot$N"/isolinux/*.hlp
+fi
+
+if [ "$HIDDEN_TIMEOUT" ]; then
+    timeout=50
+elif [ "$CDIMAGE_LIVE" = 1 ]; then
+    timeout=300
+else
+    timeout=0
+fi
+sed -i "s/^timeout .*/timeout $timeout/" \
+    boot$N/isolinux/isolinux.cfg boot$N/isolinux/prompt.cfg
+# Isolinux config file.
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    DEFAULT_LABEL=live
+else
+    DEFAULT_LABEL=install
+fi
+APPLIES_INSTALL=install
+if [ -d "$CDDIR/install/maverick" ]; then
+    APPLIES_INSTALL="$APPLIES_INSTALL install-maverick"
+fi
+cat > boot$N/isolinux/text.cfg <<EOF
+default $DEFAULT_LABEL
+EOF
+> boot$N/isolinux/adtext.cfg
+if [ "$GFXBOOT" ]; then
+    cat >> boot$N/isolinux/isolinux.cfg <<EOF
+gfxboot bootlogo
+EOF
+fi
+if [ "$PROJECT" = ubuntu ] || [ "$PROJECT" = ubuntu-server ] || \
+   [ "$PROJECT" = ubuntu-mid ] || [ "$PROJECT" = ubuntu-netbook ] || \
+   [ "$PROJECT" = ubuntu-moblin-remix ] || [ "$PROJECT" = mythbuntu ]; then
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+foreground=0xFFFFFF
+background=0x958490
+screen-colour=0x270A1E
+EOF
+elif [ "$PROJECT" = kubuntu ] || [ "$PROJECT" = kubuntu-netbook ]; then
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+foreground=0xFFFFFF
+background=0x000000
+screen-colour=0x005082
+EOF
+fi
+if [ "$HIDDEN_TIMEOUT" ]; then
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+hidden-timeout=$HIDDEN_TIMEOUT
+EOF
+fi
+if [ "$PROJECT" = kubuntu ] || [ "$PROJECT" = kubuntu-netbook ]; then
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+access-options=v1 v2 m1
+EOF
+elif [ "$PROJECT" = xubuntu ]; then
+    # v1 and m1 don't have the necessary sed calls for Xubuntu yet.
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+access-options=v2 v3 m2
+EOF
+fi
+cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label normal=Normal
+append normal=
+EOF
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    cat >> boot$N/isolinux/text.cfg <<EOF
+label live
+  menu label ^Try $HUMANPROJECT without installing
+  kernel /casper/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED boot=casper initrd=$CASPER_INITRD quiet splash --
+EOF
+    if [ "$PROJECT" != ubuntu-mid ]; then
+	cat >> boot$N/isolinux/text.cfg <<EOF
+label live-install
+  menu label ^Install $HUMANPROJECT
+  kernel /casper/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED boot=casper only-ubiquity initrd=$CASPER_INITRD quiet splash --
+EOF
+    fi
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label driverupdates=Use driver update disc
+append driverupdates=debian-installer/driver-update=true
+applies driverupdates=live live-install
+EOF
+fi
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+    if [ "$CDIMAGE_LIVE" != 1 ]; then
+	cat >> boot$N/isolinux/text.cfg <<EOF
+label install
+  menu label ^Install $HUMANPROJECT
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED initrd=/install/initrd.gz quiet --
+EOF
+    else
+	cat >> boot$N/isolinux/text.cfg <<EOF
+label install
+  menu label ^Install $HUMANPROJECT in text mode
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED initrd=/install/initrd.gz quiet --
+EOF
+    fi
+    if [ -d "$CDDIR/install/maverick" ]; then
+	cat >> boot$N/isolinux/text.cfg <<EOF
+label install-maverick
+  menu label ^Install $HUMANPROJECT (2.6.35 kernel)
+  kernel /install/maverick/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED initrd=/install/maverick/initrd.gz quiet --
+EOF
+    fi
+    cat >> boot$N/isolinux/adtext.cfg <<EOF
+label expert
+  menu hide
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED priority=low initrd=/install/initrd.gz --
+EOF
+    if [ -d "$CDDIR/install/maverick" ]; then
+	cat >> boot$N/isolinux/adtext.cfg <<EOF
+label expert-maverick
+  menu hide
+  kernel /install/maverick/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED priority=low initrd=/install/maverick/initrd.gz --
+EOF
+    fi
+    if [ "$PROJECT" = edubuntu ]; then
+	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label workstation=Install a workstation
+replace workstation=file=/cdrom/preseed/workstation.seed
+applies workstation=$APPLIES_INSTALL
+EOF
+    fi
+    if [ "$CDIMAGE_DVD" = 1 ] && [ "$PROJECT" != edubuntu ] && [ "$PROJECT" != ubuntu-server ]; then
+	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label server=Install a server
+replace server=file=/cdrom/preseed/ubuntu-server.seed
+applies server=$APPLIES_INSTALL
+EOF
+    fi
+fi
+if [ "$PROJECT" != edubuntu ] && [ "$PROJECT" != ubuntu-moblin-remix ]; then
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label oem=OEM install (for manufacturers)
+append oem=oem-config/enable=true
+EOF
+    if [ "$CDIMAGE_LIVE" = 1 ]; then
+	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+applies oem=live live-install $APPLIES_INSTALL
+EOF
+    else
+	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+applies oem=$APPLIES_INSTALL
+EOF
+    fi
+fi
+if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+    if [ "$PROJECT" != ubuntu-server ]; then
+	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label cli=Install a command-line system
+replace cli=file=/cdrom/preseed/cli.seed
+applies cli=$APPLIES_INSTALL
+EOF
+    else
+	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label minimal=Install a minimal system
+replace minimal=file=/cdrom/preseed/ubuntu-server-minimal.seed
+applies minimal=$APPLIES_INSTALL
+label minimalvm=Install a minimal virtual machine
+replace minimalvm=file=/cdrom/preseed/ubuntu-server-minimalvm.seed
+applies minimalvm=$APPLIES_INSTALL
+EOF
+	# This really ought to be in gfxboot.cfg instead, but we want to
+	# make it particularly prominent.
+	cat >> boot$N/isolinux/text.cfg <<EOF
+label cloud
+  menu label Install Ubuntu ^Enterprise Cloud
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS file=/cdrom/preseed/cloud.seed initrd=/install/initrd.gz quiet --
+EOF
+	if [ -d "$CDDIR/install/maverick" ]; then
+	    cat >> boot$N/isolinux/text.cfg <<EOF
+label cloud-maverick
+  menu label Install Ubuntu ^Enterprise Cloud (2.6.35 kernel)
+  kernel /install/maverick/vmlinuz
+  append $KERNEL_PARAMS file=/cdrom/preseed/cloud.seed initrd=/install/maverick/initrd.gz quiet --
+EOF
+	fi
+    fi
+fi
+if [ "$CDIMAGE_INSTALL" = 1 ] && ([ "$PROJECT" = ubuntu ] || [ "$PROJECT" = xubuntu ] || [ "$PROJECT" = edubuntu ]); then
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label ltsp=Install an LTSP server
+replace ltsp=file=/cdrom/preseed/ltsp.seed
+applies ltsp=$APPLIES_INSTALL
+EOF
+fi
+if [ "$CDIMAGE_INSTALL" = 1 ] && [ "$PROJECT" = mythbuntu ]; then
+    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label ltsp=Install a Diskless Image Server
+replace ltsp=file=/cdrom/preseed/ltsp.seed
+applies ltsp=$APPLIES_INSTALL
+EOF
+fi
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    cat >> boot$N/isolinux/text.cfg <<EOF
+label check
+  menu label ^Check disc for defects
+  kernel /casper/vmlinuz
+  append $KERNEL_PARAMS boot=casper integrity-check initrd=$CASPER_INITRD quiet splash --
+EOF
+elif [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+    cat >> boot$N/isolinux/text.cfg <<EOF
+label check
+  menu label ^Check disc for defects
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS MENU=/bin/cdrom-checker-menu initrd=/install/initrd.gz quiet --
+EOF
+fi
+if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+    cat >> boot$N/isolinux/adtext.cfg <<EOF
+label rescue
+  menu label ^Rescue a broken system
+  kernel /install/vmlinuz
+  append $KERNEL_PARAMS rescue/enable=true initrd=/install/initrd.gz --
+EOF
+    if [ -d "$CDDIR/install/maverick" ]; then
+	cat >> boot$N/isolinux/adtext.cfg <<EOF
+label rescue-maverick
+  menu label ^Rescue a broken system (2.6.35 kernel)
+  kernel /install/maverick/vmlinuz
+  append $KERNEL_PARAMS rescue/enable=true initrd=/install/maverick/initrd.gz --
+EOF
+    fi
+fi
+cat >> boot$N/isolinux/text.cfg <<EOF
+label memtest
+  menu label Test ^memory
+  kernel /install/mt86plus
+label hd
+  menu label ^Boot from first hard disk
+  localboot 0x80
+EOF
+
+fi
+
+# write final lines to mkisofs_opts
+if [ "$NN" = "1" ]; then
+    echo -n "boot$N " >> $N.mkisofs_opts
+else
+    if [ -n "$THISTYPE" ]; then
+	echo -n "-c boot/boot.catalog boot$N "  >> $N.mkisofs_opts
+    fi
+fi
+
+if [ "$IMAGE_FORMAT" = "vfat" ]; then
+	mv boot$N/isolinux boot$N/syslinux
+	mv boot$N/syslinux/isolinux.cfg boot$N/syslinux/syslinux.cfg
+fi
+
+# th,th, thats all

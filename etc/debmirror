@@ -1,0 +1,5 @@
+SRC=kambing.ui.ac.id
+METHOD=http
+KOMPONEN=main
+ARSITEKTUR=i386,amd64
+

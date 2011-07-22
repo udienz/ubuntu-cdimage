@@ -1,0 +1,5 @@
+<chrp-boot>
+<description>${HUMANPROJECT} ${CODENAME} CD</description>
+<os-name>${HUMANPROJECT}</os-name>
+<boot-script>boot &device;:\install\yaboot</boot-script>
+</chrp-boot>

@@ -1,0 +1,6 @@
+# Install the Xubuntu desktop.
+tasksel	tasksel/first	multiselect xubuntu-desktop
+# No XFCE translation packages yet.
+d-i	pkgsel/language-pack-patterns	string
+# Language support is expected to be missing.
+d-i	pkgsel/install-language-support	boolean false

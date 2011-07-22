@@ -1,0 +1,45 @@
+#! /usr/bin/perl -w
+
+# Copyright (C) 2005 Canonical Ltd.
+# See the README file for the licence.
+#
+# Make sure packages' priorities are in sync with the current definition
+# of the base system, so that debootstrap >= 0.3.1 can work out the
+# correct set of packages to install.
+
+my $override = shift;
+my $important = shift;
+
+open IMP, "< $important" or die "can't open $important for reading: $!";
+my %important;
+while (<IMP>) {
+    chomp;
+    $important{$_} = 1;
+}
+close IMP;
+
+open IN, "< $override" or die "can't open $override for reading: $!";
+open OUT, "> $override.new" or die "can't open $override.new for writing: $!";
+
+while (<IN>) {
+    chomp;
+    my ($pkg, $prio, $sect) = split;
+    # Packages in %important must have priority no lower than 'important'.
+    # Packages not in %important must have priority no higher than
+    # 'standard'.
+    if ($important{$pkg}) {
+	if ($prio ne 'required' and $prio ne 'important') {
+	    $prio = 'important';
+	}
+    } else {
+	if ($prio eq 'required' or $prio eq 'important') {
+	    $prio = 'standard';
+	}
+    }
+    print OUT "$pkg\t$prio\t$sect\t\n";
+}
+
+close OUT or die "can't close $override.new: $!";
+close IN;
+rename "$override.new", $override
+    or die "can't rename $override.new to $override: $!";

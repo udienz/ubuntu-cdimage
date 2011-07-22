@@ -1,0 +1,7 @@
+# Build an LTSP client chroot.
+d-i	ltsp-client-builder/run	boolean true
+# Install the Ubuntu desktop and LTSP server.
+tasksel	tasksel/first	multiselect ubuntu-desktop
+d-i	pkgsel/include	string ltsp-server-standalone openssh-server
+# Build a client chroot.
+d-i	preseed/late_command	string chroot /target /usr/sbin/ltsp-update-sshkeys

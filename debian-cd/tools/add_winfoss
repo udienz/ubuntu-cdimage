@@ -1,0 +1,41 @@
+#! /bin/sh -e
+
+BDIR=$TDIR/$CODENAME-$FULLARCH
+
+if [ "$PROJECT" = edubuntu ] && [ "$CDIMAGE_ADDON" != 1 ] && [ "$CDIMAGE_DVD" != 1 ]; then
+	CD=CD2 # old-style add-on CD
+else
+	CD=CD1
+fi
+
+if [ -f "$LIVEIMAGES/$ARCH.winfoss.tgz" ]; then
+	tar -C "$BDIR/$CD" -xzf "$LIVEIMAGES/$ARCH.winfoss.tgz"
+	if [ -e "$BDIR/$CD/programs/firefox/Firefox Setup 1.0.exe" ]; then
+		mv "$BDIR/$CD/programs/firefox/Firefox Setup 1.0.exe" \
+			"$BDIR/$CD/programs/firefox/FirefoxSetup1.0.exe"
+	fi
+	if [ -e "$BDIR/$CD/programs/thunderbird/Thunderbird Setup 1.0.exe" ]; then
+		mv "$BDIR/$CD/programs/thunderbird/Thunderbird Setup 1.0.exe" \
+			"$BDIR/$CD/programs/thunderbird/ThunderbirdSetup-1.0.exe"
+	fi
+fi
+
+if [ -f "$LIVEIMAGES/$ARCH.wubi.exe" ]; then
+	# Wubi always goes on CD1.
+	cp -a "$LIVEIMAGES/$ARCH.wubi.exe" "$BDIR/CD1/wubi.exe"
+fi
+
+if [ -f "$LIVEIMAGES/$ARCH.umenu.exe" ]; then
+	# umenu always goes on CD1.
+	cp -a "$LIVEIMAGES/$ARCH.umenu.exe" "$BDIR/CD1/umenu.exe"
+fi
+
+if [ -f "$LIVEIMAGES/$ARCH.wubi-cdboot.exe" ]; then
+	# Wubi (for CD booting only) always goes on CD1.
+	cp -a "$LIVEIMAGES/$ARCH.wubi-cdboot.exe" "$BDIR/CD1/wubi-cdboot.exe"
+fi
+
+if [ -f "$LIVEIMAGES/$ARCH.autorun.inf" ]; then
+	# autorun.inf always goes on CD1.
+	cp -a "$LIVEIMAGES/$ARCH.autorun.inf" "$BDIR/CD1/autorun.inf"
+fi

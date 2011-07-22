@@ -1,0 +1,10 @@
+Welcome to Ubuntu ${DEBIAN_VERSION} (${CODENAME})!
+
+This is an Ubuntu installation ${MEDIA_TYPE},
+built on ${BUILD_DATE}.
+
+The default option is 'install'. For maximum
+control, you can use the 'expert' option.
+
+If in doubt, just press Enter.
+

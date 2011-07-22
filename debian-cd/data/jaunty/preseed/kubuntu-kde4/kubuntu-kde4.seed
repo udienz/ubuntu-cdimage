@@ -1,0 +1,7 @@
+# Install the Kubuntu desktop.
+tasksel	tasksel/first	multiselect kubuntu-kde4-desktop
+d-i	preseed/early_command	string . /usr/share/debconf/confmodule; db_get debconf/priority; case $RET in low|medium) db_fset tasksel/first seen false ;; esac
+# Install KDE translation packages.
+d-i	pkgsel/language-pack-patterns	string kde-l10n-$LL
+# Install the KDE oem-config frontend (if in OEM mode).
+d-i	oem-config-udeb/frontend	string kde

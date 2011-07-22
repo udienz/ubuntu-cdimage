@@ -1,0 +1,4 @@
+# Install the LTSP server.
+base-config	base-config/package-selection	string ~tubuntu-standard|~tubuntu-desktop|ltsp-server-standalone
+# Build a client chroot.
+base-config	base-config/late_command	string ltsp-build-client

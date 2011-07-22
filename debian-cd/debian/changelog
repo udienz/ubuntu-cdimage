@@ -1,0 +1,1109 @@
+debian-cd (2.2.23) unstable; UNRELEASED
+
+  * Steve McIntyre
+    - Added sed hack to make sarge appear as "stable" in the Release
+      files we generate on the CDs.
+    - Download the release notes and try to fit them onto
+      CD#1. Updated sarge's README.html.in to point to them
+	- Updated tools/add-bin-doc to stop warnings on this.
+    - Added patch from Sven Luther to add a forth script to make
+ 	  ppc/pegasos easier to boot.  Closes: #311925
+    - Re-add the kernel-headers packages to match kernel images (only
+	  on i386 and amd64). Closes: #249386
+    - Made list2cds more verbose
+    - Added tools/sarge/upgrade-hppa.sh and tools/sarge/upgrade-sparc.sh
+      to install the upgrade-kernel bits on CD#1
+    - Added tools/dedicated_source: simple script used to add extra
+      source packages onto _binary_ CDs. Used for the amd64 sarge release
+      so far.
+  * Joey Hess
+    - Synced up all sarge changes to etch.
+    - Use dpkg --print-architecture instead of now-deprecated
+      --print-installation-architecture
+  * Stephen R. Marenka
+    - Changed m68k boot for etch to handle etch changes in d-i.
+	
+debian-cd (2.2.22) unstable; urgency=critical
+
+  * Steve McIntyre
+    - Prepared YA "last before sarge" debian-cd release
+    - Urgency "Critical" to make sure we make it in...
+  * Joey Hess
+    - Add post-sarge udebs rescue-check, initrd-preseed, and preseed-common
+      to the udeb exclude list since these will be/are inluded on sid initrds.
+    - Add etch directories; point sid symlinks to them.
+    - Add rescue stanzas to etch isolinux.cfg. Rescue mode is supported in
+      post-sarge d-i images only.
+    - Add support for f4.txt that is for systems with the 2.6 kernel.
+    - Exclude new mouse-modules udebs from CDs until something in d-i uses
+      them.
+    - debian-installer task files renamed to include distro name and branched
+      for etch.
+  * Steve McIntyre
+    - Make woody's post-boot-mipsel script cope with extra fields in the
+      output of sarge's isoinfo
+    - Add Suggests: on netpbm and syslinux. Closes: #301345
+    - Count the total number of binary and source discs better; sarge can
+      have more than 9 CDs, so ?.packages doesn't cut it any more.
+    - Don't copy the whole d-i cdrom directory onto CD1 for amd64.
+      Closes: #306926
+    - Don't copy boot.img.gz onto amd64 CD1.
+    - Added Manty's testingcds script as an example of debian-cd use
+    - Updated sarge task lists to match the latest sarge CD build
+  * Santiago Garcia
+    - Allow the usage of a local mirror of the daily d-i builds to be used
+      for sid_d-i builds, this is done by setting DI_WWW_HOME=default and
+      DI_DIR=/path/to/the/mirror
+    - Add autorun capabilities to i386 cds so that instead of getting the
+      "what do you want Windows to do" question under XP, we get the html
+      README started. Closes: #185238
+    - Make the jigdos use the same naming scheme as the isos, as per my
+      proposal to the list.
+    - Add some amd64 patches from Goswin: Fixed boot-amd64 and added
+      some packages missing on netinsts.
+    - Port to etch previous changes I commited for sarge.
+
+ -- Steve McIntyre <93sam@debian.org>  Wed, 01 Jun 2005 13:04:33 +0100
+
+debian-cd (2.2.21) unstable; urgency=low
+
+  * Steve McIntyre:
+    - Prepared YA "last before sarge" debian-cd release.
+  * Raphael Hertzog
+    - One line patch to correct a five year old bug that nobody noticed !
+      Closes: #285382
+    - Change maintainer to "Debian CD Group <debian-cd@lists.debian.org>" and
+      put myself into Uploaders (as well as Santiago Garcia Mantinan & Steve
+      McIntyre). That's because I'm not keeping up well enough with debian-cd
+      and I need more people involved in managing bugs.
+    - Apply patch from Horms <horms@debian.org> to fix some problems with
+      inclusion of local udebs. Closes: #258029
+    - Apply another patch from horsm@debian.org to try to look for d-i images
+      in "local" dirs first. Closes: #258026
+    - Use LC_ALL=C when calling apt-cache since the output is now translated.
+      Closes: #290959
+  * Steve McIntyre
+    - Substantially updated update-cd:
+       - Cope with Woody r3 updates taking more than 1 CD per
+         architecture.
+       - (Optionally) use JTE mkisofs extensions to create jigdo
+         files directly.
+    - Added amd64 support in several places, looking (oddly) very similar
+      to i386 for now. The help texts displayed by isolinux at boot still
+      need updating - HELP!
+  * Stephen R. Marenka
+    - m68k: add kernel-image-2.4.27-amiga to debian-installer+kernel.
+  * Santiago Garcia
+    - Update debian-installer's tasks.
+    - Update calc script and calc files.
+    - Make i386 cds 8.3 filenaming compatible again.
+    - Workaround the two kernels problem on hppa.
+    - Fix the kernel-image-2.4.27-amiga thing on generate_di+k_list.
+    - Add support for arm to generate_di+k_list.
+  * Joey Hess again:
+    - Since amd64 is not on standard debian mirrors, and generate_d-i+k_list
+      must be runnable on them, make it chack for absence of amd64 Packages
+      files and add a dummy kernel for amd64. This will need to be manually
+      kept up-to-date by the amd64 people for now.
+    - Didn't fix generate_di_list the same way, since doing so would be too
+      hard. Next time tasks/debian-installer is updated using this script on
+      a machine w/o the unofficial amd64 archive, the am64 info in the file
+      will be lost.
+    - Add DO NOT EDIT warning messages to generated files in cvs.
+    - Check and revert manual modifications to tasks/base-sarge. This file is
+      automatically generated and those mods would have been lost:
+        - Add fileutils to generate_d-i+k_list, "until kernels get fixed",
+          whatever that means.
+        - arcboot was already in generate_d-i+k_list.
+    - Update tasks/debian-installer+kernel using generate_d-i+k_list.
+    - Sort package lists in tasks/base-sarge to ease comparisons when
+      updating.
+    - Update tasks/base-sarge for debootstrap 0.2.45. This includes the
+      following removals:
+         - aboot: already listed in debian-installer+kernel
+         - gcc-3.2-base, libdb2, libgcrypt1, libgnutls7, libident,
+           libdb2, libtasn1-0: obsolete
+         - modconf: obsoleted by d-i
+         - setserial: not base anymore
+         - slang1: turned into slang1a-utf8
+         - libident: not needed by base anymore
+         - lilo: in debian-installer+kernel
+         - mbr: not installed anymore
+         - pcmcia-cs: in debian-installer+kernel
+         - syslinux: not installed
+         - "filesutils": typo; fileutils in generate_d-i+k_list for m68k
+         - quik: in debian-installer+kernel
+         - yaboot: in debian-installer+kernel
+         - arcboot: in debian-installer+kernel
+         - delo: in debian-installer+kernel
+      And the following additions:
+         - libdb4.2, libgcrypt11, libgcrypt7, libgnutls10, libgnutls11,
+           libgpg-error0, libtasn1-2: new libraries
+         - console-tools: now installed by debootstrap even on s390
+    - Exclude all the new amd64 kernel images from cd #1, no space.
+    - Forgot to exclude old kernel-image-2.6.7-1-686-smp from cd #1.
+    - Add network-console-config to forcd1 since it's needed by the
+      network-console udeb. Closes: #279238
+    - Exclude xmail from CD1 (new MTA), and exim (old MTA)
+    - Exclude some kernel-headers with no matching kernel-images from CD1.
+    - Update task lists to reflect tasksel changes.
+    - Exclude new kernels from CD1.
+    - Switch mips daily builds to new builds by ths.
+    - Update task files for tasksel 2.22.
+    - Exclude more new kernel images from CD1.
+    - Stop hardcoding sid as the distribution to take the installation manual
+      from, use DI_CODENAME instead.
+    - Add OMIT_MANUAL variable, which can be set to 1 to drop the install
+      manual from small CDs to save space. We will probably be adding several
+      new translations, and possibly PDFs, and that would use too much space
+      on the small CDs.
+    - Also make the README link to the manual on the Debian web site if
+      OMIT_MANUAL=1.
+    - Update the README to mention manual translations are available.
+    - More README updates from patch by Frans Pop. Closes: #300301
+    - libdevmapper1.00 renamed to libdevmapper1.01, update debian-installer
+      task. Closes: #298724
+    - Sparc daily builds moved.
+  * Bdale Garbee
+    - update tasks and tools to make 2.6.8 kernels primary on hppa
+    - add ramdisk_size=16384 to palo call in post-boot-hppa 
+  * Colin Watson
+    - Disable CD timeout on powerpc.
+    - Add localechooser to exclude-udebs.
+
+ -- Steve McIntyre <93sam@debian.org>  Mon, 21 Mar 2005 22:07:51 +0000
+
+debian-cd (2.2.20) unstable; urgency=medium
+
+  * Joey Hess
+    - Remove bogus init=/linuxrc, we have not had a linuxrc in d-i for a long
+      time and I don't know how that managed to work.
+    - Update path to ia64 cdrom/boot.img.
+    - Tweaked exclude-udebs-i386, removing fat-modules as it's not available
+      otherwise if booting from floppy, and removing excludes of partconf,
+      partitioner, and discover2-data-udeb, which are not in unstable for i386
+      any longer.
+    - Updated exclude-udebs to match the current CD initrd package list.
+    - Access floppy reorg.
+    - Sparc daily builds moved to joshk's builds.
+    - Update tasks for 2.4.27 and 2.6.8 kernels.
+    - Remove access floppies to save space on netinsts. Also remove
+      net-drivers floppy and some other things not really needed for install
+      from CD.
+    - Add 2.6 kernels to ia64 netinst CDs (and incidentially, update to
+      2.4.27).
+    - Drop i386 floppies that have gone away in d-i.
+    - Put 2.4, not 2.6 kernels on hppa cd.
+  * Stephen R. Marenka
+    - Add support for m68k reorganization.
+    - Bump m68k 2.4 kernels to 2.4.27.
+    - Handle missing m68k/bvme6000 floppy.
+  * Petter Reinholdtsen
+    - New variable SPLASHPNG pointing to replacement splash image on i386.
+  * Kenshi Muto
+    - Fix cp routine around EXTRA_DISK_IMAGES in tools/boot/sarge/boot-i386
+      (add space to cp arguments)
+    - Add floppy/asian-root.img, floppy/mideast-root.img and
+      floppy/cyrillic-root.img to EXTRA_DISK_IMAGES (but may it be treated
+      as DISK_IMAGES?)
+    - Fix typo in test evaluation. (tools/boot/sarge/boot-i386)
+    - Add localization-config.
+  * Colin Watson
+    - Add "--" end of installer kernel params markers to yaboot.conf.
+    - Drop compatibility with old powerpc 2.4/2.6 d-i image layout, since
+      the changed image layout reached sarge a while ago.
+    - Remove 2.4 images from power3 and power4; those few who want them can
+      netboot.
+    - Remove 2.6 PReP images from power3 and power4, as no such machines
+      exist.
+    - Hardlink powerpc and powerpc/minimal vmlinux files together, since
+      they're identical.
+    - Remove powerpc-small-pmac kernel from the netinst. base-installer
+      hasn't installed it since April, and according to Sven it's only
+      useful for building floppies.
+  * Santiago Garcia
+    - Try to fix powerpc DVD builds via -hfs-parms MAX_XTCSIZE.
+    - Add prep powerpc support.
+    - Update debian-installer tasks.
+    - Add tools/calc script to update .calc files with up to date
+      estimations on the iso size parameters.
+  * Thiemo Seufer
+    - Add arcboot to the mips tasks/base-sarge list, like it is done for
+      other bootloaders.
+    - Add a default bootfile named sashARCS for mips, aliased to r4k-ip22.
+  * Joshua Kwan
+    - Add ramdisk_size=16384 to silo.conf. closes: #274958
+  * Steve McIntyre
+    - Another upload before sarge.
+	
+ -- Steve McIntyre <93sam@debian.org>  Fri,  22 Oct 2004 21:12:15 +0100
+
+debian-cd (2.2.19) unstable; urgency=medium
+
+  * Steve McIntyre
+    - (Hopefully this time) Final medium-urgency upload to get a
+      recent debian-cd in before the sarge release. A few bugfixes needed:
+    - Removed silly build-dep-indep on mkisofs. Closes: #258018
+    - Fixed typo in tools/boot/sarge/boot-i386. Closes: #267026
+  * Santiago Garcia
+    - Change build.sh to allow building non complete CDs, like netinsts.
+
+ -- Steve McIntyre <93sam@debian.org>  Fri, 20 Aug 2004 14:59:11 +0100
+
+debian-cd (2.2.18) unstable; urgency=medium
+
+  * Steve McIntyre
+    - Final medium-urgency upload to get a recent debian-cd in before
+      the sarge release.
+    - Update default version to sarge/3.1 for a sarge release.
+    - Sarge is going to have more than 9 CDs; make sure we clean up all of
+      the working dirs.
+    - Removed the -T option to mkisofs. We don't need the TRANS.TBL files
+      any more, and we should save the space.
+    - Added support for SIZE_MULT_x when calculating full disc
+      sizes. Best use is on m68k and powerpc images where HFS hybrid
+      metadata seems to add ~10% to the size of the image.
+    - Various updates to update-cd to cope with changes r0->r2.
+    - Updated copy of CONF.sh in debian directory to match the working copy in .
+    - Small lintian fixes.
+  * Raphael Hertzog
+    - Add missing Build-Depends-Indep. Closes: #258018
+    - Remove debian-keyring.tar.gz from the doc dir.
+    - Don't include Contents-$ARCH.gz on netinst/businesscard CD.
+  * Joey Hess
+    - Include sarge installation manual on sarge CDs.
+    - Remove install/doc, and just use doc/install.
+    - Patch from Thiemo Seufer to add mips and mipsel kernels.
+      Also, remove some packages from arches that do not need them.
+    - Remove module-init-tools-udeb from the CD.
+    - Remove raidtools2-udeb from the exclude list, while nothing depends on
+      it, it can be handy for manually setting up raid.
+    - discover has been renamed to discover1
+    - On i386, include discover on the CD as well, this is discover verson
+      2, and is used with the 2.6 kernel.
+    - Based on user reports, remove the read-only, and pass "rw" to the kernel
+      in silo.conf.
+    - Include only 2.4 ia64 kernels on the d-i CD for now, the 2.6 ones
+      are not a good choice ATM according to bdale.
+    - silo.conf fixes.
+    - Fix mirror_check to look under LOCALDEBS for files if it is set.
+    - Add mdadm to the netinst CD, needed for software raid installs.
+    - Add lvm2 (and dependencies libdevmapper1.00 and lvm-common)
+      for new partman. Left lvm10 on the CD for now, remove later.
+    - Add jfsutils to netinst cds.
+    - Add usbutils to netinst cds, it'll be installed by a future version
+      of hw-detect.
+    - Add tools/get_diskusage.pl (originally by Petter).
+    - Add update-popcon Makefile target (taken from Skolelinux).
+    - Add a KERNEL_PARAMS variable, which can be used to add kernel parameters
+      and is useful for creating things like CDs that install in critical
+      priority mode. I only implemented it for i386 so far.
+    - Add MAXCDS config variable, which forces debian-cd to stop after a given
+      number of binary CDs.
+    - Only exclude udebs from the CD that are in both the cd initrd and the
+      hd-media initrd, since both use the CD. This adds back floppy-modules
+      and firewire-core-modules.
+    - Add new default udeb_include files (for to full CDs and DVDs) that
+      include ethdetect and netcfg, to make network configuration happen in
+      first stage, since the second stage cannot currently do any.
+      Closes: #240458
+    - Include debian-installer+kernel into Debian_sarge task to ensure all
+      debs as well as udebs used by d-i are included.
+    - Exclude newer versions of i386 kernels to save space. Leave 2.6.x-386
+      kernels on the CD.
+    - Update task-essential-sarge to tasksel 2.05. Fix the generator to work
+      with post-2002 tasksels.
+    - Update task-full-sarge and task.list to tasksel 2.05. The task.list was
+      manually ordered to give desktop task priority, followed by servers,
+      followed by languages.
+    - NORECOMMENDS should be used for sarge official CD sets (getting full
+      tasks is more important), and is on by default.
+    - Add libfribidi0 to generate_di+k_list, needed for BIDI.
+    - Switch CONF.sh to sarge.
+    - Uncomment exclude lines.
+    - Remove the boot.bat script and redundant and incorrect README.tools.
+      The alternative is to maintain and document them.
+    - Exclude kernel sources from popcon results, old data skews this badly.
+    - Remove old kernel sources from interesting-fromcd23, and various other
+      removals and updates.
+    - Update the task lists and popcon again.
+    - Stop excluding 686 and 686-smp kernels, as these are probably the most
+      popular, and they fit on CD#1 now.
+    - Add "--" end of installer kernel params markers to the isolinux.cfg.
+  * Petter Reinholdtsen
+    - Regenereated tasks/popularity-contest-sarge based on the current data.
+    - Avoid kernel versions 2.4.24 and 2.6.3 on the first i386 CD, as we
+      are currently using 2.4.25.
+    - Remove packages not in testing from exclude-sarge.
+    - Update list2cds to allow #-comments in the exclude file.
+    - Try to create $(OUT) instead of just bailing out if it is missing.
+    - Missing b-f documentation is not a fatal error.  Keep
+      building if it is missing.
+    - Make it possible to give different CONF.sh files to build.sh.
+    - Make it possible to change which images to build using CONF.sh.
+    - Use DI_CODENAME to locate the installation system.  This make it
+      possible to use debian-installer with Woody CDs.
+    - Avoid illegal dash (-) in cpp architecture defines.  Patch
+      from Colin Watson.
+  * Stephen R. Marenka
+    - Update m68k support for sarge.
+        - Fix m68k/amiga icons.
+        - Add 2.2 kernel-based cdrom initrd.
+        - Redo m68k subarch boot/install for sarge.
+        - Bump all subarchs to 2.4 kernel, except mac.
+        - Add bvme6000 boot code.
+        - Workaround boot/install for non-DI_WWW_HOME case.
+  * Santiago Garcia
+    - Update isolinux.bin to the version we are shipping with Sarge.
+    - Update debian-installer tasks.
+    - Update boot scripts for sarge to be able to build cds using d-i
+      images from the chosen dist using the mirror or from the web.
+    - Add support for sarge bootable mips cds.
+    - Add support for sarge bootable sparc cds.
+    - Add kernel 2.6 on i386 cds, remove it from the exclusion list.
+    - Add support for booting 2.6 as well as 2.4 to the first i386 cd.
+    - Add dirty temporal workaround for saving space on netinst images.
+      This should be fixed in a proper way when time permits.
+    - Make fast_sums ignore md5sums of files not in the pool directory.
+      Closes: #247889
+    - Add support for sarge bootable mipsel cds (delo based), needs work.
+    - Fix the dirty workaround bug that was adding debs to businesscards.
+    - Add 2.6 support to powerpc cds.
+    - Add yaboot to powerpc netinst cds as debootstrap no longer adds it.
+    - Update boot-sparc not to depend on a kernel version.
+    - Remove ramdisk_size param of silo.conf.
+    - Add initrd-tools to sparc di+k list.
+    - Generate PPC CD 1 with -chrp-boot. Closes: #252667
+    - Increase max catalog size on PPC DVDs. Closes: #252652
+  * Bdale Garbee
+    - shorten the command line in post-boot-hppa for sarge, as palo can't
+      handle a command line longer than 127 chars right now
+  * Otavio Salvador
+    - Preprocess exclude files much like tasks files are. Closes: #247379
+    - Check if the missing debootstrap-required is not included on
+      base_exclude.
+    - Fix preprocess of exclude files when EXCLUDE is not set.
+  * Kenshi Muto
+    - Add floppy/asian-root.img and floppy/access/* as i386 disk image.
+  * Colin Watson
+    - Add exclude-udebs-powerpc list with packages already in the initrd,
+      along the same lines as exclude-udebs-i386. Saves about 11 megabytes.
+    - Add bootable CD support for arm, following Vince Sanders' advice.
+    - Include kernel-image-2.4-* metapackages for ia64.
+    - Unexclude zlib1g-udeb, needed for ssh support in d-i.
+    - Make sure quik is on the powerpc netinst CD; debootstrap no longer
+      installs it.
+    - Bump initrd-size to 10MB for powerpc 2.4. Current d-i initrds exceed
+      that.
+    - Remove -safe options from powerpc yaboot menu, as they caused
+      combinatorial explosion. Instead, document video=ofonly in boot.msg.
+    - Clarify powerpc boot.msg a bit.
+    - Cope with debian-installer powerpc image rearrangement.
+  * Sven Luther
+    - fixed powerpc list so it includes the 2.6 kernels too as well as the
+      power3 and power4 2.4 kernels.
+  * Steve Langasek
+    - Add alpha and mipsel bootloaders to debian-installer+kernel,
+      so debootstrap doesn't have to install them
+
+ -- Raphael Hertzog <hertzog@debian.org>  Thu, 25 Mar 2004 07:33:23 +0100
+
+debian-cd (2.2.17) unstable; urgency=low
+
+  * Removed debian/conffiles (useless with debhelper 4).
+  * Added aptitude on netinst CD (but not on businesscard CD).
+    Closes: #220125, #219986
+    It is already on CD1 of a normal CD set.
+  * Kenshi Muto
+    - Add jfbterm, unifont into forcd1, d-i+kernel (second stage of
+      debian-installer needs them).
+    - Add console-cyrillic, console-terminus, hotplug, iso-codes into forcd1,
+      d-i+kernel.
+  * Joey Hess
+    - Add "expert" mode to isolinux.cfg for sarge.
+    - Remove pump-udeb from all udeb_includes; netcfg depends on and
+      uses dhcp-client-udeb.
+    - Add appropriate kernel-pcmcia-modules package to
+      debian-installer+kernel task for i386.
+    - Update the yaboot boot.msg to match the one in d-i cvs.
+    - Update the yaboot.conf to add expert and expert-safe boot modes.
+    - Link the d-i INSTALLATION-HOWTO into doc/, if it exists.
+    - Add my exclude_udebs lists, for general and i386, and modify
+      generate_di_list to not include udebs from those lists onto the
+      cdrom, to save space on the netinst cds. Closes: #215469
+    - Use the d-i docs in sid instead of the woody boot floppies docs.
+    - Add pcmcia-cs-udeb to sarge's i386_netinst_udeb_include, to support
+      pcmcia installs.
+    - Remove console-keymaps from all udeb_includes; they are included
+      on the cdrom initrds.
+    - Switch from netcfg-static/dhcp to just netcfg.
+    - Split udeb_includes for businesscard and netinst; netinst does not
+      need choose-mirror, while businesscard does.
+    - Add wireless-tool-udeb to udeb_include for i386 and powerpc netinst
+      and businesscard images.
+    - Add pcmcia-cs onto the generate-di+k_list, now that is is not
+      autoinstalled by debootstrap.
+    - Document vga=771 boot option for laptops with screen problems.
+    - Add the debian-edu udebs to the exclude list for netinst CDs, and
+      remove the deleted di-utils-devicefiles.
+    - Update boot/sarge/boot-i386 to use the new d-i image names.
+    - Use d-i boot screens from the debian-cd_info.tar.gz. 
+      Closes: #220612, #221186
+    - Remove the netboot initrd from netinst CDs, since d-i builds a mini-iso
+      with this initrd on it, and since the d-i help screen does not mention
+      the net type.
+    - Add xfsprogs and reiserfsprogs to generate_di+k_list.
+    - Add lilo as well; it's not autoinstalled by debootstrap, but
+      lilo-installer still uses it.
+    - Increase the i386 isolinux ramdisk size to 10 mb; it's grown due to
+      translatons and all the scsi drivers.
+    - Drop lowmemcheck from the CD; it is in the initrd.
+    - Add wireless-tools to generate_d-i+k_list
+    - Remove the old partitioner from the CD for i386. (This should also be
+      done for other arches for which it is not default)
+    - Include all the powerpc kernels that d-i's base-installer currently
+      could try to install on the CD.
+    - Try to include some sparc kernels on the CD; it's probably better than
+      including none..
+    - Revamped the README.html, removing the old manual apt setup
+      instructions, various references to woody, fixing the link to the LDP
+      home page, dropping reference to the basically dead non-us section,
+      removing confusing references to non-free being on the CD, dropping
+      references to dselect, etc.
+    - Fix layout of README.txt, adding missing <p>'s after headings.
+    - Drop README.mirrors and README.non-US from the CDs.
+  * Steve Langasek
+    - Add fdisk-udeb to the list of needed debs for alpha
+    - Use /dev/ram as the root device for aboot (alpha)
+  * Petter Reinholdtsen
+    - Updated tasks/README with new location of popularity-contest results.
+    - Regenereated tasks/popularity-contest-sarge based on the current
+      data.
+    - Avoid acorn-fdisk, cfdisk-utf8 and lots of kernels on the first CD.
+      It should be enough with one kernel package on the first CD.
+    - Make generated debian-installer list easier to read by adding
+      arch info at the end of an #ifdef block.
+  * Santiago Garcia
+    - Add DI_CODENAME variable make it posible to build cds with a special
+      debian-installer version.
+    - Make Makefile remove dedication files except for current version.
+    - Update debian-installer.* tasks
+    - Add hppa kernels to generate_di+k_list
+    - Add sarge boot scripts for hppa
+
+ -- Raphael Hertzog <hertzog@debian.org>  Wed, 20 Aug 2003 20:17:06 +0200
+
+debian-cd (2.2.16) unstable; urgency=low
+
+  * Updated standards-version to 3.6.0.
+  * Use debhelper 4 (build-depends on it, updated DH_COMPAT).
+  * WARNING: potato is now mostly unsupported, some cruft has been
+    removed that may have been useful for generating potato CDs.
+  * Added debian-installer support. debian-installer is automatically
+    used if $MIRROR/dists/$CODENAME/main/debian-installer exists.
+    (however you have to require the inclusion of the udeb via the
+    task mechanism, cf tasks/debian-installer for the current list)
+  * Added all files for sarge (in tasks/ data/ and tools/).
+  * Updated isolinux.bin from syslinux 1.75-1.
+  * Tollef Fog Heen:
+    - Make it possible to exclude contrib from the CDs. Useful if you only
+      have a mirror of main.
+    - The names of the bootable images have changed on
+      people.d.o/~tfheen/d-i/images/daily, update download scripts to reflect
+      that.
+  * Petter Reinholdtsen:
+    - Add CONTRIB flag to debian/CONF.sh.
+    - Add support for BASE_INCLUDE and BASE_EXCLUDE, making files
+      cdrom/.disk/base_include and .../base_exclude used by
+      debian-installer.
+    - Document BOOTDISKS.
+    - Make disk number available in tools/add-bin-doc.
+    - In woody, keep the time stamp of smb.bin when copying it to CD.
+    - Add support for UDEB_INCLUDE and UDEB_EXCLUDE, making files
+      cdrom/.disk/udeb_include and .../udeb_exclude used by
+      debian-installer.
+  * Apply patch from Petter Reinholdtsen for inclusion of
+    Recommends/Suggests from the base system. Closes: #106903
+  * Apply nice patch from Santiago Garcia Mantinan for building
+    "netinst CDs" !
+  * Don't check dependencies for udebs, they tend to be broken
+    and we still want them on the CD.
+  * Put good default values for UDEB_INCLUDE based on the value of
+    INSTALLER_CD.
+  * Many updates on the tasks files by Josip Rodin. Removed useless packages
+    from sarge CD1... and so on.
+  * Updated hfs.map with .sit info (for powerpc arch). Closes: #186837
+
+ -- Raphael Hertzog <hertzog@debian.org>  Wed, 20 Aug 2003 19:59:54 +0200
+
+debian-cd (2.2.15) unstable; urgency=low
+
+  * Apply patch for mipsel boot support. Closes: #145318
+    Thanks to Karsten Merker.
+  * Updated README.sbm with more info provided by Santiago
+    Marcia Mantinan.
+  * Reordered some woody task files. Thanks to Philip Charles.
+  * Added cpp in the Depends field. Closes: #145869
+  * Fixed error message in Makefile. Closes: #146184
+  * Updated tools/add_secured to work with all versions of md5sum
+    (including the one that comes with dpkg >= 1.10).
+  * Protect the call to add_secured by a stamp file. Closes: #147105
+  * Provide a customised isolinux image. We don't need to
+    recommend syslinux now.
+  * Apply patch from Petter Reinholdtsen to put security updates on the cd.
+  * Apply patch from Petter Reinholdtsen to preserve timestamps, making
+    build.sh being able to run with -e set, report reserved space and
+    the space debootstrap needs.  Also, handle boot-floppy directories
+    without docs.
+  * Make sure discover, read-edid and mdetect are on the first CD if
+    possible.
+
+ -- Raphael Hertzog <hertzog@debian.org>  Tue, 17 Sep 2002 21:18:05 +0200
+
+debian-cd (2.2.14) unstable; urgency=high
+
+  * Updated the script to update tasks/base-woody. Closes: #138651
+  * Anne commited stuff for inclusion of a local security.debian.org.
+  * Added NOSUGGESTS in a similar way than NORECOMMENDS. Thanks
+    to Petter Reinholdtsen <pere@hungry.com>.
+  * Added "decompacted language packs" to the bootable CDs.
+    Closes: #139179
+  * Corrected name of kernel s/linux/linux.bin/ (why the hell
+    do they need to change that name now ...). Closes: #139503
+    Change has been made for arches where the latest bf are
+    available. More may need to come for arches like sparc
+    which are catching up with bf.
+  * More changes of kernel name in anticipation of the upcoming
+    boot floppies for sparc & alpha.
+  * Change the order of flavors in the i386 CD set. First is "idepci",
+    second "compact", third "bf2.4" and fourth the old default one. At
+    least we have the language chooser on the first CD but it's still
+    2.2 based. Reworked the MULTIBOOT code to take this into account.
+  * Added capability to generate DVD-sized images. Use bc to calculate
+    disk sizes in build.sh and build_all.sh, and use the textutils
+    version of md5sum to avoid missing large file support in dpkg
+    version. Specify the output image sizes in CONF.sh
+  * Added ISOLINUX code (export ISOLINUX=yes in CONF.sh); this provides a
+    "rescue floppy like" boot screen that allows choosing between kernel
+    images, rather than loading the rescue disks directly from the boot
+    sector.
+  * Removed obsolete local-variables section from changelog.
+  * Added default values into CONF.sh for isolinux support.
+  * Change again the order of the boot images for i386.
+    1: multiboot (isolinux) 2: vanilla 3: compact 4: idepci 5: bf2.4
+  * Put TERM=vt102 for vanilla flavor as it seems to fix the borders
+    of the boxes in a few cases.
+  * Improved the test to see if we want non-free. Instead of -n "$NONFREE"
+    it's now "${NONFREE:-0}" != "0" (same for EXTRANONFREE). Maybe
+    should we do the same for the other boolean environment variables like
+    LOCAL, SECURITY, SECURED ...
+  * Changed the test for ISOLINUX and MULTIBOOT to be coherent with the other
+    boolean variables.
+  * Dropped old el-torito multiboot support. Documented the choice of
+    isolinux in README.devel.
+  * added ramdisk_size=8192 to palo commandline for hppa
+  * Added empty boot-mips & boot mipsel.
+  * Updated boot-alpha to conditionalize the inclusion of APB.
+  * Reworked boot-ia64 to use hardlinks and so 1_NONUS.raw is built properly.
+  * Reworked post-boot-hppa to hardcode path to palo, and to ensure
+    1_NONUS.raw is built properly.
+  * Added Smart Boot Manager image for people who want to boot ISOLINUX
+    image on machine with BIOS which don't support them.
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sun, 28 Apr 2002 15:52:32 +0200
+
+debian-cd (2.2.13) unstable; urgency=low
+
+  * Add jigdo generation support (see README).
+  * Automatically add packages listed by local debootstrap. Closes: #131820
+  * Adapted to new s390 boot-floppies 3.0.19 directory structure (Stefan
+    Gybas <sgybas@debian.org>).
+  * Updated boot-i386 for the boot-floppies 3.0.19.
+  * Don't include the base-images-* directories on the CD. They
+    are meant for people wishing to install by floppy (who download the
+    floppy images from the net).
+  * Corrected the priority to match the priority given in the override file.
+  * CDs with .disk/kernel_installable have the disks-<arch> directories
+    and those with .disk/base_installable have all the packages required
+    by debootstrap.
+  * Updated base-woody with debootstrap 0.1.17. Closes: #138357
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sat, 16 Mar 2002 19:53:41 +0100
+
+debian-cd (2.2.12) unstable; urgency=low
+
+  * Get it right this time with the MULTIBOOT test ... Closes: #127234
+  * Correct spelling mistake in README.devel. Closes: #127726
+  * Make the log output more consistent and offer the possibility
+    to not force the inclusion of recommended/suggested packages.
+    Thanks to Petter Reinholdtsen for the patches.
+    Closes: #127964, #127968
+  * Undef some automatic variable substitution (like i386)
+    of cpp causing problems while generating tasks files. Closes: #129044
+    Thanks again to Petter Reinholdsten.
+  * Don't fail if Contents-$ARCH files are missing. Closes: #129166
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sat, 29 Dec 2001 19:57:23 +0100
+
+debian-cd (2.2.11) unstable; urgency=medium
+
+  * Changed "==" test by "=" test that works with ash also. Closes: #125727
+  * Corrected the rules files to remove the .#* files of CVS merges.
+    Closes: #125728
+  * Corrected the documentation. Closes: #125729
+  * Complains about missing Release files. Closes: #126076
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sun, 16 Dec 2001 04:34:03 +0100
+
+debian-cd (2.2.10) unstable; urgency=low
+
+  * first test of multi-boot cdimage for i386 disk #1
+    You must export MULTIBOOT="yes" in CONF.sh  to enable this feature. -jwest
+  * Removed "ide" boot floppy's flavor. Closes: #120415
+  * Added support for s390 (Jochen Röhrig <jr@debian.org>).
+  * Documentation about the fact the environment variables may
+    pollute your environment after a debian-cd run. Closes: #123289
+
+ -- Raphael Hertzog <hertzog@debian.org>  Mon, 26 Nov 2001 18:21:50 +0100
+
+debian-cd (2.2.9) unstable; urgency=low
+
+  * Added i386 boot blocks for udam100-ext3 to disk 5 -jwest
+  * Added i386 boot blocks for reiserfs to disk 6 - jwest
+  * Drop support of slink. Drop support of dpkg-multicd.
+  * Uses apt-ftparchive and no more dpkg-scan{packages,sources}.
+  * Does use the extra override file. Closes: #113794
+  * Remove the use of unzip in boot-alpha. Nobody should use unzip...
+  * Update yaboot.conf and ofboot.b to conform to current (1.3.4) yaboot (powerpc).
+  * If using BOOTDISK= pick up docs from there also (Richard Hirst).
+  * Synced tasks/base-woody with debootstrap 0.1.15.8.
+    Closes: #119099
+  * Add kludgy yaboot.conf for potato's broken yaboot.
+  * ia64, only first disk is bootable, and use symlinks in /install
+    to save space.  rescue.bin is 10MB on ia64.  (Richard Hirst)
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sun, 16 Sep 2001 14:57:22 +0200
+
+debian-cd (2.2.8) unstable; urgency=low
+
+  * Be less restrictive on non-US section name (ie accepts non-us too).
+  * Add support for ia64 (Richard Hirst).  Closes: #110553.
+  * Update the "Components" field of the Release files. Was
+    causing a bug in debootstrap.
+  * Add support for hppa (Richard Hirst).
+  * Removed the last reference to unzip. No more references to lha
+    either. So debian-cd can go in main.
+  * Changes for powerpc were made by Ethan Benson. Closes: #104333
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sun, 19 Aug 2001 13:42:27 +0200
+
+debian-cd (2.2.7) unstable; urgency=low
+
+  * Minor fix in tools/woody/installtools.sh
+  * Disabled the secured stuff by default. Make it configurable
+    with a environment variable.
+  * Various other little changes (in particular wrt LOCAL handling).
+
+ -- Raphael Hertzog <hertzog@debian.org>  Tue, 24 Jul 2001 18:56:33 +0200
+
+debian-cd (2.2.6) unstable; urgency=medium
+
+  * Updated tasks/base-woody to be in sync with debootstrap 0.1.15.
+  * Improved documentation about Official images. Closes: #101578
+  * Build woody CD set by default now. Updated CONF.sh accordingly.
+  * Use Digest::MD5 instead of MD5. Depends on libdigest-md5-perl
+    instead of "libdigest-md5-perl | libmd5-perl". Closes: #104184
+
+ -- Raphael Hertzog <hertzog@debian.org>  Tue, 19 Jun 2001 00:43:04 +0200
+
+debian-cd (2.2.5) unstable; urgency=low
+
+  * Remove (obsolete) -a from mkhybrid call. Changed mkhybrid to mkisofs
+    since mkhybrid has been superseded by mkisofs. Closes: #97439
+  * Only includes latest version of a package if a newer version
+    is provided in a local repository.
+  * Includes on CD1 packages needed by debootstrap. Closes: #100353
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sat, 19 May 2001 15:15:29 +0200
+
+debian-cd (2.2.4) unstable; urgency=medium
+
+  * All (i386) CD's now have a different kernel from boot-disks.
+  * Updated pi-makelist, now excludes all of the sparc live filesystem.
+  * Added Recommends: debianutils because pi-makelist uses tempfile(1)
+    since 2.2.3; also mentioned this in the debian-cd/YACS README.
+  * Some minor updates/rewordings in CD's top-level README.
+  * Typo. tools/add_dirs line #26 changed to if [ -n     --jwest
+    Closes: #79902
+  * Include a new interactive boot.bat. Closes: #83471
+  * Corrected tools/apt-selection. Closes: #79903
+  * Does correctly manage pools wrt Packages files. 
+  * Now depends on grep-dctrl.
+  * Now creates a $CODENAME-secured tree with Release and Release.gpg
+    files from the archive. Closes: #93612
+  * Some esthetic corrections to the Makefile.
+  * Updated the popularity-contest file.
+  * Redesigned and updated README to match new www.debian.org style.
+  * Added exclude feature for source packages and un-exclude feature
+    for binary packages.
+  * Updated and reorganized package/popularity lists, as produced by the
+    "Useful CD 1 Project". More info in tasks/README.
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sat, 28 Apr 2001 23:56:14 +0200
+ 
+debian-cd (2.2.3) unstable; urgency=low
+
+  * Fixes several bug caused by changes in the way binary-all packages
+    are referred to in the Packages files. Closes: #76178
+  * Does now handle sources for a local repository correctly. Closes: #76179
+  * Fix a bug in make extras. Closes: #76181
+  * Added a commodity local symlink for old-fashioned tools like multi_cd
+    which want local packages in dists/local/local. Closes: #76186
+  * Many thanks to Vladimir Michl who provided me patches for the 4 bug
+    mentionned above.
+  * Changed mirror_check to use case insensitive pattern matching for
+    detecting headers. Closes: #70838
+  * Documentation updates about the SIZELIMIT stuff and bootable CDs.
+    Closes: #72067, #68913
+  * There's still no good reasons to remove the unstable symlink. 
+    Closes: #68477
+  * OUT doesn't have to be a relative path. In fact, the default shipped
+    in the CONF.sh file is an absolute path and it does work. 
+    Closes: #75406
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sat,  4 Nov 2000 15:36:10 +0100
+
+debian-cd (2.2.2) frozen unstable; urgency=low
+
+  * Still targeted to frozen. Documentations (README.html on the CD) updates
+    & other little changes. 
+  * Fixed targets bin-image and src-image to use CD$(CD) instead of $(CD).
+  * Added "." after -F argument for symlink farm user. Closes: #66599
+  * Misc changes for woody i386 bootdisks --jwest
+  * Fixed the patch from Joey. :) ${LOCALDEBS:-$MIRROR} instead of
+    ${LOCALDEBS:-MIRROR}. s/CODNAME/CODENAME/ too. Closes: #66737
+  * This bug is unreproducable and the submitter didn't respond. 
+    Probably a local configuration error. Closes: #66526
+
+ -- Raphael Hertzog <hertzog@debian.org>  Fri, 30 Jun 2000 17:50:16 +0200
+
+debian-cd (2.2.1) frozen unstable; urgency=low
+
+  * Should go to frozen as well...
+  * build.sh,build_all.sh: Better guess at size of bin CD 1
+  * Added the "needed" task file as tasks/forcd1.
+  * Update for m68k, they should at least build now.
+  * Include upgrade-{i386,sparc,alpha,m68k} dir when available.
+  * Updated README.html.in (new version provided by Anne Bezemer).
+  * Added EXTRANONFREE support. It allows to generate an extra non-free CD.
+    The first CDs are totally free and the last(s) CD(s) contains 
+    only non-free and possibly some files from contrib.
+  * Added extra file to help fine tune the CD sizes per archs
+  * Edited boot-alpha to work (I hope) based on what was available in the
+    README.txt in boot-floppies
+  * Modified build_all.sh so that it puts each arch under a subdir and
+    modified imagesums/pi-makelist to support the subdirs
+  * Added FORCENONUSONCD1 support - move all non-US packages/sources to
+    CD#1 of the set. We then make 2 copies of this, one with non-US and
+    one without. Useful for people wanting to create non-US and US-safe
+    CDs without having to spend so much disk space.
+  * Added patch from Joey Hess for LOCALDEBS support. Closes: #66447
+  * Added patch from Michael Schlueter (corrected cpp call when
+    FORCENONUSONCD1 was not used)
+
+ -- Raphael Hertzog <hertzog@debian.org>  Sat, 20 May 2000 23:42:58 +0200
+
+debian-cd (2.2.0) frozen unstable; urgency=low
+
+  * The final debian-cd for potato ! Must go to frozen ...
+  * Changes to tools/potato/boot-sparc for new bootdisk
+    organization. --jwest
+  * Changes to /tools/boot/potato/boot-i386 for new bootdisks --jwest
+    Closes: #59250, #64124
+  * Added missing semi-colon in the target pi-makelist.
+  * /install/boot.bat not working because of missing loadlin.exe fixed
+  * Updates to sparc bootable
+  * Updates to woody/boot-i386 --jwest
+  * Add powerpc support for potato (dan).
+  * Incorporated some documentation (courtesy of J.A. Bezemer) :
+    README.html & README.txt 
+  * Make translated documentation more easily available. Closes: #64276
+  * Added arm support (easy, they don't have bootable CD). 
+
+ -- Raphael Hertzog <hertzog@debian.org>  Thu, 18 May 2000 23:59:49 +0200
+
+debian-cd (2.1.92) frozen unstable; urgency=low
+
+  * This version goes to frozen since it's used for building potato CD.
+    Another one will follow once we have the final boot-floppies.
+    But I already upload this one because I'm getting complaints since
+    the old package doesn't work with the actual boot-floppies available
+    on the mirror...
+  * Added files for woody (yes, people already burn woody CD images)
+  * Make the second CD bootable on i386 with the "compact" image.
+  * Changes to installtools.sh, change to check for documentation
+    directory name by $ARCH.
+    -> This change will have to be removed when all arch will have synced
+    boot floppies.
+  * Changes to tools/potato/boot-i386 for support of the 2.2.3 bootdisks.
+    Closes: #53529 #58304
+  * In Makefile, if there are multiple versions of the
+    bootdisks in the source tree, the section "boot:" seems to get
+    confused. Not fixed. Temporary solution, move old i386 boot
+    disks out of the source archive.
+  * Added a file tasks/popularity-contest listing packages by order of
+    usefulness (results given by the popularity contest of course). This
+    file is included at the end of the Debian_potato task in order to
+    include the packages that are widely used on the first CD if possible.
+  * Added a bunch of set -e.
+  * Added pi-makelist target to generate the *.list files used by the
+    Pseudo Image Kit. Needs isoinfo in the cdwrite package.
+  * Updated README and README.devel. Explained that the main source
+    is on CVS and that patch should apply on the CVS tree not on the
+    source package available on the Debian FTP.
+  * Added possibility to include local packages on the CD set. Documented
+    it. Closes: #50640
+  * Documented the fact that TMP path must be on the same partition than
+    the mirror. Closes: #59524
+
+ -- Raphael Hertzog <hertzog@debian.org>  Tue,  7 Mar 2000 19:03:44 +0100
+
+debian-cd (2.1.91) unstable; urgency=low
+
+  * Splitted the boot scripts for slink & potato. Updated the Makefile
+    to handle this.
+  * Updated the tasks/Debian_potato to use the new task-* packages.
+  * New boot-i386 which does use resc2880.bin (the tecra image has
+    been removed since it does no more exist in the latest boot-floppies).
+  * Can now build CD with bootdisks taken from somewhere else than
+    the mirror (allow you to use your own boot floppies, notably those
+    built with translated documentation).
+  * The documentation from the boot-floppies are now installed
+    in /install and /doc by the scripts tools/$CODENAME/installtools.sh
+    It was needed since the documentation of the boot-floppies does
+    differ from one dist to another ...
+  * Removed some cruft which is no more needed (master for potato,
+    status.i386).
+  * Updated README to explain that the mkhybrid package in Debian
+    does support the -F option. Closes: #50141
+
+ -- Raphael Hertzog <hertzog@debian.org>  Thu, 11 Nov 1999 20:50:26 +0100
+
+debian-cd (2.1.90-1) unstable; urgency=low
+
+  * Moved to contrib because of the unzip and lha dependencies.
+  * Corrected the boot-m68k script (bvme600 -> bvme6000).
+  * YACS 0.5 :
+  * ----------
+  * tools/add_dirs: don't create section subdirectories for non-US.
+  * tools/*: full slink compliance. Should build slink disk even with
+    non-US. Thanks to the help of Filip Van Raemdonck <mechanix@dma.be>.
+  * Makefile: added an upgrade target called when building
+    official_images. It will call tools/$CODENAME/upgrade.sh if possible.
+    Created this upgrade.sh file for slink.
+  * YACS can/should generate complete slink images with this release.
+    Please test. In particular for non-i386 CD images. I want to check
+    if the scripts to make CD bootables are (still) working.
+  * tools/apt-selection: removed some bashisms.
+  * Many data has been splitted by codename. This is to allow
+    us to build slink and potato CD without much troubles.
+  * Updated the master file for potato. Added the old one for slink.
+  * Status file is now automatically generated when a provided one
+    is not available (data/$CODENAME/status.$ARCH).
+  * build.sh build_all.sh: convenience scripts to build CD images.
+  * YACS 0.4 :
+  * ----------
+  * New status file for potato i386.
+  * When including packages listed in the status file check that they
+    exist before.
+  * Call dpkg-scansources for generating Sources.gz file on the source 
+    CD. And depends on dpkg-dev (>= 1.4.1.6) to be sure that we have it.
+  * Add dependency to libdigest-md5-perl.
+  * list2cds: try to select all suggested/recommended packages not only from
+    packages explicitely selectionned but also from packages listed
+    in dependencies.
+  * list2cds: many little checks added, now generates a log.list2cds
+    file (in the temp dir).
+  * YACS 0.3 :
+  * ----------
+  * This version has herited nothing from the previous debian-cd 
+    package only the changelog has been added.
+  * It can now build sources CD.
+  * This package does now replace slink_cd and the old debian-cd.
+    I'll close the bugs (after checking that the new debian-cd behaves
+    correctly with the bug report situation) affected to those packages.
+  * The Packages.cd files are generated correctly (the same way than
+    slink_cd did).
+  * Added the good dependencies. Closes: #25710, #36109, #27758
+  * Some bugs are no more applicable. Closes: #24708, #25195, #31044, #24418
+    Closes: #36115, #36228
+  * No source URL in copyright file since this is a Debian native 
+    package. Closes: #36111
+  * Full GPL isn't included. Closes: #36113
+  * Missing newlines added. Closes: #36114
+  * The README is a good documentation for building CD. Closes: #17540
+  * Added the support for hooks. Closes: #36112
+  * Added a link index.html -> install.html. Closes: #38402
+  * Files are better placed. Closes: #36110
+  * Rebuilding the Contents file is of no use. And if you really need
+    it, you can do it yourself with the hook system. Closes: #36116
+  * Internationalization is a boot-floppies problem. Closes: #25210
+  * Tried miniunz but it lacks important feature like -L ... still
+    uses unzip. And recommends it. 
+
+ -- Raphael Hertzog <hertzog@debian.org>  Thu, 29 Jul 1999 18:26:09 +0200
+
+debian-cd (2.0.2) unstable; urgency=low
+
+  * get rid of .html from the errata URL
+  * add contents to README.official
+    
+ -- Philip Hands <phil@hands.com>  Fri, 24 Jul 1998 00:09:22 +0100
+
+debian-cd (2.0.1) unstable; urgency=low
+
+  * add the copyright/licence intro from the install docs to the main readme
+  * add a reference to http://www.debian.org/2.0/errata.html to the main README
+  * generally tidy up README's
+
+ -- Philip Hands <phil@hands.com>  Thu, 23 Jul 1998 18:41:23 +0100
+
+debian-cd (2.0.0) unstable; urgency=low
+
+  * Suggest cdrecord (rather than Depend) since it's not needed to create
+    images, only to write them.
+  * get rid of purge_duff_disks hack
+  * fix timestamp to use 24 hour clock and GMT
+  * add README.contrib to all CD images
+
+ -- Philip Hands <phil@hands.com>  Wed, 22 Jul 1998 12:16:16 +0100
+
+debian-cd (1.99.18) unstable; urgency=low
+
+  * add dependencies (closes: #9072, #19116)
+  * add $(init-dists) for contrib (closes: #24465)
+  * make check_mirror.pl able to deal with md5sums.gz (closes: 24418)
+
+ -- Philip Hands <phil@hands.com>  Fri, 17 Jul 1998 22:06:16 +0100
+
+debian-cd (1.99.17) unstable; urgency=low
+
+  * add -p option to tecra boot mkdir
+  * add missing define for ``install-source-x11''
+  * fix making of .mkisofsrc
+
+ -- Philip Hands <phil@hands.com>  Wed, 15 Jul 1998 15:16:48 +0100
+
+debian-cd (1.99.16) unstable; urgency=low
+
+  * add hack to get rid of old 2.0.6 disks
+
+ -- Philip Hands <phil@hands.com>  Wed,  8 Jul 1998 17:46:18 +0100
+
+debian-cd (1.99.15) frozen unstable; urgency=low
+
+  * separate boot/ dir to get boot image near the start of the ISO image
+    resulting in bootable CD's for all (or so I hope)
+  * rework makefiles using defines instead of targets, and generally tidy up
+  * fix image-md5sum and image-date targets
+
+ -- Philip Hands <phil@hands.com>  Wed,  8 Jul 1998 13:29:52 +0100
+
+debian-cd (1.99.14-4) frozen unstable; urgency=low
+
+  * make mkisofs-source use resc1440tecra.bin as boot image (rather than the
+    cdboot.bin hack)
+
+ -- Philip Hands <phil@hands.com>  Tue,  7 Jul 1998 14:13:54 +0100
+
+debian-cd (1.99.14-3) frozen unstable; urgency=low
+
+  * fix typo in mkisofs-source target
+
+ -- Philip Hands <phil@hands.com>  Tue,  7 Jul 1998 14:03:34 +0100
+
+debian-cd (1.99.14-2) frozen unstable; urgency=low
+
+  * use the normal resc1440 images for CD booting, since they are now built
+    with syslinux -s
+  * get rid of binary-all from the source image
+
+ -- Philip Hands <phil@hands.com>  Tue,  7 Jul 1998 13:51:23 +0100
+
+debian-cd (1.99.14-1) frozen unstable; urgency=low
+
+  * This should really go in hamm, so that the scripts to build the CD's
+    end up on the CD's.  Of course this will probably require a few attempts
+    before the scripts here settle down, because other changes are still being
+    made to hamm that affect these.
+  * edit some README's and Configuration defaults.  Done with a -1 version
+    so my diff's come out in the diff file
+  * put the hamm --> ../hamm link back into dists
+
+ -- Philip Hands <phil@hands.com>  Fri,  3 Jul 1998 11:31:26 +0100
+
+debian-cd (1.99.14) stable unstable; urgency=low
+
+  * use Andreas Jellinghaus's makefile system for building CD's (starting with
+  * 0.14)
+
+ -- Philip Hands <phil@hands.com>  Tue, 30 Jun 1998 22:15:59 +0100
+
+debian-cd (1.0.0) stable unstable; urgency=low
+
+  * What was in vars.sh is now individual files per variable in the
+    vars/ directory.
+
+  * Various edits from the experience of making the Official CDs.
+
+ -- Bruce Perens <bruce@debian.org>  Sun, 10 Aug 1997 21:02:17 -0700
+
+debian-cd (0.1.6) frozen unstable; urgency=low
+
+  * Remove quotes from strings in .mkisofsrc, they were being
+    put on the disc. Pad filesystems for Linux read-ahead bug.
+
+ -- Bruce Perens <bruce@debian.org>  Fri, 13 Jun 1997 10:08:42 -0700
+
+debian-cd (0.1.5) frozen unstable; urgency=low
+
+  * Put vars.sh in debian/conffiles, so that a user's altered one 
+    will not be over-written.
+
+  * boot.bat was broken.
+
+ -- Bruce Perens <bruce@debian.org>  Fri, 30 May 1997 10:46:33 -0700
+
+debian-cd (0.1.4) frozen unstable; urgency=low
+
+  * Add COLOPHON.txt, a readme about how the CD was produced.
+    This is my last release before going on vacation, if anything
+    needs to be fixed in this package for 1.3, someone else must
+    fix it.
+
+ -- Bruce Perens <bruce@debian.org>  Wed, 30 Apr 1997 12:35:02 -0700
+
+debian-cd (0.1.3) frozen unstable; urgency=low
+
+  * Add SOURCE.txt, a readme about source-code availability, to the
+    binary CD. Make distribution both frozen and unstable. 
+
+ -- Bruce Perens <bruce@debian.org>  Wed, 23 Apr 1997 23:22:37 -0700
+
+debian-cd (0.1.2) unstable; urgency=low
+
+  * Add El Torito bootable-CD patches from Helmut Geyer. 
+
+ -- Bruce Perens <bruce@debian.org>  Sun, 23 Apr 2000 10:31:08 -0700
+
+debian-cd (0.1.1) unstable; urgency=low
+
+  * Change architecture to "all". 
+
+ -- Bruce Perens <bruce@debian.org>  Fri, 18 Apr 1997 22:51:36 -0700
+
+debian-cd (0.1.0) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Bruce Perens <bruce@debian.org>  Fri, 18 Apr 1997 22:20:51 -0700

@@ -1,0 +1,13 @@
+# Install the Xubuntu usplash image.
+d-i	base-installer/kernel/linux/extra-packages-2.6	string usplash xubuntu-artwork-usplash
+# Adjust task names for Xubuntu.
+d-i	archive-copier/desktop-task	string xubuntu-standard|xubuntu-desktop
+d-i	archive-copier/ship-task	string xubuntu-ship
+# Build an LTSP client chroot.
+d-i	ltsp-client-builder/run	boolean true
+# Install the Xubuntu desktop and LTSP server.
+d-i	pkgsel/install-pattern	string ~t^xubuntu-standard$|~t^xubuntu-desktop$|~n^ltsp-server-standalone$|~n^openssh-server$
+# No XFCE translation packages yet.
+d-i	pkgsel/language-pack-patterns	string
+# Build a client chroot.
+d-i	preseed/late_command	string chroot /target /usr/sbin/ltsp-update-sshkeys

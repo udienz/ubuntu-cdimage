@@ -32,7 +32,7 @@ fi
 CPUARCHES="$(echo "$ARCHES" | xargs -n1 | sed 's/+.*//' | sort -u | xargs)"
 
 GNUPG_DIR="$CDIMAGE_ROOT/secret/dot-gnupg"
-SIGNING_KEYID=FBB75451
+SIGNING_KEYID=89EEDAB3
 
 BRITNEY="$CDIMAGE_ROOT/britney"
 

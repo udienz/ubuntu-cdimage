@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# post-boot-i386
+#
+# Do post-image-building tasks for i386, to make vfat images bootable
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+# $3 is the image file
+
+set -e
+
+N=$1
+CDROOT=$2
+CDIMAGE=$3
+
+cd $CDROOT/..
+
+# Only disk 1* bootable
+if [ $N != 1 ] && [ $N != 1_NONUS ] && [ -z "$CDIMAGE_ADDON" ]; then
+	exit 0
+fi
+# We only want to do this for vfat images
+if [ "$IMAGE_FORMAT" = "vfat" ]; then
+	syslinux -d syslinux $CDIMAGE
+fi
+

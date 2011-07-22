@@ -1,0 +1,93 @@
+#!/bin/bash -e
+# 
+# boot-sparc sarge+
+#
+# Do install stuff for sparc, including making first CD bootable
+
+. $BASEDIR/tools/boot/$DI_CODENAME/common.sh
+
+set -e
+
+N=$1
+CDDIR=$2
+if [ "$DI_WWW_HOME" = "default" ];then
+   DI_WWW_HOME="http://people.debian.org/~stappers/d-i/images/daily/cdrom"
+fi
+if [ ! "$DI_DIST" ]; then
+   DI_DIST="$DI_CODENAME"
+fi
+if [ -z "$DI_PATH" ]; then
+   DI_PATH="$($BASEDIR/tools/find-newest-installer)"
+fi
+
+default_preseed
+
+:> $N.mkisofs_opts
+
+# Only disc 1* bootable
+if [ $N != 1 -a $N != 1_NONUS ]; then 
+	exit 0; 
+fi
+
+install_languages $CDDIR
+
+"$BASEDIR/tools/sorting_weights" "$N"
+echo -n "-sort $(pwd)/$N.weights " >> $N.mkisofs_opts
+
+echo -n "-G boot1/boot/isofs.b -B ... boot1" > $N.mkisofs_opts
+rm -rf boot1
+
+inst=boot1
+
+# Setup directories
+mkdir -p $inst/boot
+
+silo_deb="$($BASEDIR/tools/apt-selection cache show silo | \
+	grep ^Filename | awk '{print $2}')"
+# put the relevant parts of SILO boot loader
+(ar p "$MIRROR/$silo_deb" data.tar.gz | \
+	tar zxf - -C $inst/ ./boot/{isofs,second}.b)
+
+if [ "$CDIMAGE_INSTALL" = 1 ]; then
+	SILO_SUFFIX=
+else
+	SILO_SUFFIX=.live
+fi
+
+# Some custom etc files
+(cat $BASEDIR/data/$CODENAME/sparc/silo.conf$SILO_SUFFIX
+ if [ "$CDIMAGE_INSTALL" = 1 ]; then
+     if [ "$PROJECT" = ubuntu-server ]; then
+         cat $BASEDIR/data/$CODENAME/sparc/silo.conf.lamp
+     fi
+ fi) \
+ | sed "s,\${DEFAULT_PRESEED},${DEFAULT_PRESEED},g" \
+ | sed "s,\${LAMP_PRESEED},${LAMP_PRESEED},g" \
+ > $inst/boot/silo.conf
+BUILD_DATE="${CDIMAGE_DATE:-$(date +%Y%m%d)}"
+cat $BASEDIR/data/$CODENAME/sparc/ubuntu.txt$SILO_SUFFIX \
+ | sed "s/\${MEDIA_TYPE}/CDROM/" \
+ | sed "s/\${DEBIAN_VERSION}/${CODENAME}/g" \
+ | sed "s/\${BUILD_DATE}/${BUILD_DATE}/g" \
+ > $inst/boot/ubuntu.txt
+
+# Sparc64 kernel is so big, that uncompressing it corrupts SILO memory, so
+# uncompress it before hand.
+
+if [ ! "$DI_WWW_HOME" ];then
+	DI_DIR="$DI_PATH/current/images/cdrom/2.6"
+else
+	DI_DIR="."
+	wget "$DI_WWW_HOME" -O di.dir
+	wget "$DI_WWW_HOME/vmlinuz"
+	wget "$DI_WWW_HOME/initrd.gz"
+fi
+if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+	cp "$DI_DIR"/initrd.gz "$inst/boot/initrd.gz"
+	zcat "$DI_DIR"/vmlinuz > "$inst/boot/sparc64"
+fi
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+	# TODO: does putting boot images in /casper/ actually work on sparc?
+	mv "$CDDIR/casper/filesystem.initrd-sparc64" "$CDDIR/casper/initrd.gz"
+	zcat "$CDDIR/casper/filesystem.kernel-sparc64" > "$CDDIR/casper/sparc64"
+fi

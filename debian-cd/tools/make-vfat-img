@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+dir=""
+size=20
+outfile=""
+while getopts d:s:o: opt; do
+	case "$opt" in
+		d) dir="$OPTARG";;
+		s) size="$OPTARG";;
+		o) outfile="$OPTARG";;
+	esac
+done
+if [ -z "$dir" ] || [ -z "$outfile" ]; then
+	echo "Usage: $0 -d <DIR> -s <SIZE> -o <OUTFILE>"
+	exit 1
+fi
+
+size=$(((($(du -sk $dir | cut -d'	' -f1) + ($size * 1024)) / 32) * 32)) 
+/sbin/mkdosfs -C $outfile $size
+for indir in $(find $dir -mindepth 1 -type d | cut -d/ -f2-); do
+	mmd -i $outfile $indir
+done
+for file in $(find $dir -type f | cut -d/ -f2-); do
+	mcopy -i $outfile $dir/$file ::$file
+done
+
