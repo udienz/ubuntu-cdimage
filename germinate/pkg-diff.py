@@ -35,7 +35,7 @@ import Germinate.version
 # TODO: cloned from germinate.py; should be common
 SEEDS = ["http://ironhide.udienz.web.id/canonical-seed/"]
 RELEASE = "ubuntu.oneiric"
-MIRRORS = ["http://archive.ubuntu.com/ubuntu/"]
+MIRRORS = ["http://kambing.ui.ac.id/ubuntu/"]
 DIST = ["oneiric"]
 COMPONENTS = ["main"]
 ARCH = "i386"
