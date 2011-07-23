@@ -119,10 +119,11 @@ if [ -z "$CDIMAGE_NOSYNC" ]; then
 			exit 1
 		fi
 		push_cleanup "rm -f $SYNC_LOCK"
-		. $CDIMAGE_ROOT/etc/debmirror debmirrorsync #anonftpsync
+		debmirrorsync main
+		rsync $HOME/public_html/ubuntu/dists/$DIST/main/installer-$ARCHES/ $CDIMAGE_ROOT/ftp/dists/$DIST/main/installer-$ARCHES/ -avh
 		ARCHES_COLONS="$(echo "$CPUARCHES" | tr ' ' ':')"
 		if [ "$CDIMAGE_UNSUPPORTED" ]; then
-			. $CDIMAGE_ROOT/etc/debmirror.universe anonftpsync
+			debmirrorsync universe
 			for component in main restricted; do
 				for distdir in "$CDIMAGE_ROOT/ftp/dists"/*; do
 					[ -d "$distdir" ] || continue

@@ -1,5 +1,5 @@
-SRC=kambing.ui.ac.id
+SRC=localhost
 METHOD=http
 KOMPONEN=main
-ARSITEKTUR=i386,amd64
+ARSITEKTUR=amd64
 

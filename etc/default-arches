@@ -1,32 +1,28 @@
 # PROJECT		IMAGE_TYPE		DIST			ARCHES
 # Put more specific matches first.
 
-*			source			*			i386
-
 mythbuntu		*			warty-edgy		amd64 i386 powerpc
 mythbuntu		*			*			amd64 i386
 
-ubuntu-netbook		*			*			i386
+ubuntu-server		*			intrepid-jaunty		amd64
+ubuntu-server		*			karmic			amd64
 
-ubuntu-server		*			intrepid-jaunty		amd64 hppa i386 ia64 powerpc powerpc+ps3 sparc
-ubuntu-server		*			karmic			amd64 i386 ia64 powerpc powerpc+ps3 sparc
+ubuntustudio		*			warty-edgy		amd64
+ubuntustudio		*			*			amd64
 
-ubuntustudio		*			warty-edgy		amd64 i386 powerpc
-ubuntustudio		*			*			amd64 i386
+xubuntu			*			natty-			amd64
 
-xubuntu			*			natty-			amd64 amd64+mac i386
+*			daily-live		gutsy-karmic		amd64
 
-*			daily-live		gutsy-karmic		amd64 i386 ia64 powerpc powerpc+ps3 sparc
+*			dvd			warty-edgy		amd64
+*			dvd			*			amd64
 
-*			dvd			warty-edgy		amd64 i386 powerpc
-*			dvd			*			amd64 i386
-
-*			*			warty-dapper		amd64 hppa i386 ia64 powerpc sparc
-*			*			edgy			amd64 i386 ia64 powerpc sparc
-*			*			feisty			amd64 i386 ia64 powerpc powerpc+ps3 sparc
-*			*			gutsy-hardy		amd64 hppa i386 ia64 powerpc powerpc+ps3 sparc
-*			*			intrepid-jaunty		amd64 hppa i386 ia64 lpia powerpc powerpc+ps3 sparc
-*			*			karmic			amd64 i386 ia64 lpia powerpc powerpc+ps3 sparc
-*			*			lucid			amd64 i386 ia64 powerpc powerpc+ps3 sparc
-*			*			maverick		amd64 amd64+mac i386 powerpc powerpc+ps3
-*			*			*			amd64 amd64+mac i386 powerpc
+*			*			warty-dapper		amd64
+*			*			edgy			amd64
+*			*			feisty			amd64
+*			*			gutsy-hardy		amd64
+*			*			intrepid-jaunty		amd64
+*			*			karmic			amd64
+*			*			lucid			amd64
+*			*			maverick		amd64
+*			*			*			amd64

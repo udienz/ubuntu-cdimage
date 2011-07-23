@@ -1,0 +1,5 @@
+SRC=localhost
+METHOD=http
+KOMPONEN=main,main/debian-installer,restricted
+ARSITEKTUR=amd64
+TO=$CDIMAGE_ROOT/ftp/

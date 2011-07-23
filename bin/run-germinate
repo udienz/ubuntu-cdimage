@@ -22,7 +22,7 @@ if [ "$IMAGE_TYPE" = source ]; then
 fi
 
 if [ "$GERMINATE_BZR" ]; then
-	SEED_SOURCE=http://bazaar.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/
+	SEED_SOURCE=http://localhost/ubuntu-seed/
 	case $PROJECT in
 		kubuntu|kubuntu-mobile)
 			if dist_ge oneiric; then

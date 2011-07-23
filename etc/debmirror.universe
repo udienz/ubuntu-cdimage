@@ -1,5 +1,5 @@
-SRC=kambing.ui.ac.id
+SRC=localhost
 METHOD=http
 KOMPONEN=universe
-ARSITEKTUR=i386,amd64
-
+ARSITEKTUR=amd64
+TO=$CDIMAGE_ROOT/ftp-universe/

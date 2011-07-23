@@ -8,7 +8,7 @@ set -e
 
 export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
 . "$CDIMAGE_ROOT/etc/config"
-#. "$CDIMAGE_ROOT/etc/debmirror"
+. "$CDIMAGE_ROOT/etc/debmirror.$1"
 
 # TO is the destination for the base of the Debian mirror directory
 # (the dir that holds dists/ and ls-lR).
@@ -43,7 +43,7 @@ cd "$CDIMAGE_ROOT/log"
 set +e
 
 debmirror --verbose --nosource --host=$SRC --root=ubuntu \
-		--method=$METHOD --progress --dist=$DIST -section=$KOMPONEN \
+		--method=$METHOD --progress --dist=$DIST,$DIST-security,$DIST-updates -section=$KOMPONEN \
 		--arch=$ARSITEKTUR $TO/ \
 		--exclude=-dbg_* \
 		--ignore-release-gpg > debmirror.log 2>&1

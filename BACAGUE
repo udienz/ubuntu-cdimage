@@ -1,0 +1,87 @@
+
+== Peralatan ==
+
+Script blankon-cdimage merupakan hasil gabungan modifikasi beberapa script
+berikut ini:
+ 
+* CD Image Script
+  http://people.ubuntu.com/~cjwatson/bzr/cdimage/mainline/
+
+* Debian CD Script
+  http://people.ubuntu.com/~cjwatson/bzr/debian-cd/ubuntu/
+
+* Germinate
+  http://people.ubuntu.com/~cjwatson/bzr/germinate/mainline/
+
+* Britney
+  http://people.ubuntu.com/~cjwatson/bzr/britney/cdimage/
+
+
+== Dependencies ==
+
+build-essential bc dctrl-tools lynx mkisofs tofrodos debootstrap procmail libapt-pkg-dev ubuntu-keyring syslinux fakeroot rsync python-minimal procps squashfs-tools bittorrent bzr debmirror python-apt python2.6 python2.6-dev
+
+
+== Bahan-bahan ==
+
+- Mirror repositori Ubuntu dan BlankOn
+- Indices Ubuntu dan BlankOn 
+- File debian-installer BlankOn (bisa juga menggunakan milik Ubuntu)
+- GPG key untuk pabrik dan arsip
+- Seeds BlankOn
+- Ruang kosong Harddisk minimal 10GB
+
+
+== ENTER!!! ==
+
+--blankon-cdimage
+  |--bin
+  |--configs
+  |--etc
+  |
+  |--britney
+  |
+  |--debian-cd
+  |  |--data
+  |  |--task
+  |  \--tools
+  |
+  |--germinate
+  |
+  |--data
+  |--log
+  |--scratch
+  |--secret
+  |--tmp
+  \--www
+
+Contoh: Untuk menjalankan pabrik CD:
+
+    sunting /srv/cdimage.blankonlinux.or.id/etc/*, sesuaikan dengan konfigurasi di system anda
+	export PATH=/srv/cdimage.blankonlinux.or.id/bin/:$PATH
+	for-project blankon
+	cron.daily
+
+
+== Mekanisme Pabrik ==
+
+Pertama-tama pabrik akan mengambil paket-paket dari repositori online BlankOn 
+dan Ubuntu yang nantinya paket-paket dari kedua repositori digabungkan & diolah 
+sedemikian rupa menjadi repositori baru yang siap digunakan oleh pabrik.
+
+Setelah ini germinate akan bekerja mengambil lalu membaca entri yang ada dalam 
+seeds dan kemudian membuat list dan task paket-paket yang akan masuk dalam CD.
+
+List dan task ini setelah beres dikirim ke debian-cd untuk diproses menjadi
+sebuah berkas ISO.
+
+== FIN ==
+
+Bila ada pertanyaan mengenai script cdimage silakan jangan ragu-ragu untuk
+langsung nge-ping mister cjwatson. (bilang salam dari gw) :P
+
+--Kopral Jono <imtheface@gmail.com>
+--Mahyuddin SUsanto <udienz@gmail.com>
+
+
+
