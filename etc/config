@@ -15,7 +15,7 @@ export LC_ALL=C
 PROJECT="${PROJECT:-ubuntu}"
 CAPPROJECT="${CAPPROJECT:-Ubuntu}"
 export ALL_DISTS="${ALL_DISTS:-warty hoary breezy dapper edgy feisty gutsy hardy intrepid jaunty karmic lucid maverick natty oneiric}"
-DIST="${DIST:-natty}"
+DIST="${DIST:-oneiric}"
 
 # If you want to build image for one or more architectures comment out the
 # following line

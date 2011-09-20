@@ -1,5 +1,5 @@
 log/
-ftp/
+ftp
 secret/
 britney/data/*
 britney/report/*
@@ -9,4 +9,6 @@ etc/.next-build-suffix*
 germinate/Germinate*/
 scratch/
 www/
-
+ftp-universe
+tmp/
+livecd/
