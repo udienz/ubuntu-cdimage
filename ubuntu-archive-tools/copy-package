@@ -1,0 +1,199 @@
+#! /usr/bin/python
+
+# Copyright (C) 2012  Canonical Ltd.
+# Author: Colin Watson <cjwatson@ubuntu.com>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 3 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Copy package publication records."""
+
+from __future__ import print_function
+
+from optparse import OptionParser, Values
+import sys
+
+from launchpadlib.errors import HTTPError
+from launchpadlib.launchpad import Launchpad
+from ubuntutools.question import YesNoQuestion
+
+import lputils
+
+
+def find_publications(options, package):
+    source = lputils.find_latest_published_source(options, package)
+    yield source, source.source_package_version
+
+    if options.include_binaries:
+        for binary in source.getPublishedBinaries():
+            yield binary, binary.binary_package_version
+
+
+def copy_packages(options, packages):
+    ret = True
+
+    for package in packages:
+        print("Copy candidates:")
+
+        source = lputils.find_latest_published_source(options, package)
+        print("\t%s" % source.display_name)
+        num_copies = 1
+
+        if options.include_binaries:
+            for binary in source.getPublishedBinaries():
+                print("\t%s" % binary.display_name)
+                num_copies += 1
+
+        print("Candidate copy target: %s" % options.destination.archive)
+        if options.dry_run:
+            print("Dry run; no packages copied.")
+        else:
+            if not options.confirm_all:
+                if YesNoQuestion().ask("Copy", "no") == "no":
+                    continue
+
+            try:
+                options.destination.archive.copyPackage(
+                    source_name=package, version=source.source_package_version,
+                    from_archive=options.archive,
+                    to_pocket=options.destination.pocket,
+                    to_series=options.destination.series.name,
+                    include_binaries=options.include_binaries,
+                    unembargo=options.unembargo,
+                    auto_approve=options.auto_approve)
+
+                print("%d %s successfully copied." % (
+                    num_copies, "package" if num_copies == 1 else "packages"))
+            except HTTPError as e:
+                print(e.content, file=sys.stderr)
+                ret = False
+
+    return ret
+
+
+def main():
+    parser = OptionParser(usage="usage: %prog [options] package [...]")
+    parser.add_option(
+        "-l", "--launchpad", dest="launchpad_instance", default="production")
+    parser.add_option(
+        "-n", "--dry-run", default=False, action="store_true",
+        help="only show copies that would be performed")
+    parser.add_option(
+        "-y", "--confirm-all", default=False, action="store_true",
+        help="do not ask for confirmation")
+    parser.add_option(
+        "-d", "--distribution", default="ubuntu",
+        metavar="DISTRIBUTION", help="copy from DISTRIBUTION")
+    parser.add_option("-s", "--suite", metavar="SUITE", help="copy from SUITE")
+    parser.add_option(
+        "-a", "--architecture",
+        metavar="ARCHITECTURE", help="architecture tag")
+    parser.add_option(
+        "-e", "--version",
+        metavar="VERSION", help="package version (default: current version)")
+    parser.add_option(
+        "-c", "--component",
+        metavar="COMPONENT", help="copy from COMPONENT")
+    parser.add_option(
+        "-p", "--ppa", metavar="OWNER", help="copy from PPA owned by OWNER")
+    parser.add_option(
+        "--ppa-name", metavar="NAME", help="copy from PPA named NAME")
+    parser.add_option(
+        "-j", "--partner", default=False, action="store_true",
+        help="copy from partner archive")
+    parser.add_option(
+        "-b", "--include-binaries", default=False, action="store_true",
+        help="copy related binaries")
+    parser.add_option(
+        "--to-primary", default=False, action="store_true",
+        help="copy (from PPA) to primary archive (default: False)")
+    parser.add_option(
+        "--to-distribution", metavar="DISTRIBUTION",
+        help="copy to DISTRIBUTION (default: copy from distribution)")
+    parser.add_option("--to-suite", metavar="SUITE",
+        help="copy to SUITE (default: copy from suite)")
+    parser.add_option(
+        "--to-ppa", metavar="OWNER",
+        help="copy to PPA owned by OWNER (default: copy from PPA owner)")
+    parser.add_option(
+        "--to-ppa-name", metavar="NAME", help="copy to PPA named NAME")
+    parser.add_option(
+        "--to-partner", default=False, action="store_true",
+        help="copy to partner archive")
+    parser.add_option(
+        "--unembargo", default=False, action="store_true",
+        help="allow copying from a private archive to a public archive")
+    parser.add_option(
+        "--auto-approve", default=False, action="store_true",
+        help="automatically approve copy (requires queue admin permissions)")
+    options, args = parser.parse_args()
+
+    if options.ppa and options.partner:
+        parser.error("cannot copy from partner archive and PPA simultaneously")
+    if options.to_ppa and options.to_partner:
+        parser.error("cannot copy to partner archive and PPA simultaneously")
+
+    options.launchpad = Launchpad.login_with(
+        "copy-package", options.launchpad_instance, version="devel")
+    lputils.setup_location(options)
+    options.destination = Values()
+    options.destination.launchpad = options.launchpad
+    options.destination.distribution = options.to_distribution
+    options.destination.suite = options.to_suite
+    options.destination.architecture = options.architecture
+    options.destination.ppa = options.to_ppa
+    options.destination.ppa_name = options.to_ppa_name
+    options.destination.partner = options.to_partner
+
+    # In cases where source is specified, but destination is not, default to
+    # destination = source
+    if options.destination.distribution is None:
+        options.destination.distribution = options.distribution
+    if options.destination.suite is None:
+        options.destination.suite = options.suite
+    if (options.ppa is not None and options.to_ppa is None and
+        not options.to_primary and not options.destination.partner):
+        options.destination.ppa = options.ppa
+    if (options.partner and not options.destination.partner and
+        not options.ppa):
+        options.destination.partner = options.partner
+
+    if options.partner != options.destination.partner:
+        parser.error("cross-partner copies are not allowed")
+
+    if options.to_primary and options.to_ppa_name is not None:
+        parser.error("--to-ppa-name option set for copy to primary archive")
+
+    lputils.setup_location(options.destination)
+
+    if options.archive.private and not options.destination.archive.private:
+        if not options.unembargo:
+            parser.error(
+                "copying from a private archive to a public archive requires "
+                "the --unembargo option")
+
+        # TODO some equivalent of canModifySuite check?
+
+    if (options.distribution == options.destination.distribution and
+        options.suite == options.destination.suite and
+        options.pocket == options.destination.pocket and
+        options.archive == options.destination.archive):
+        parser.error("copy destination must differ from source")
+
+    if copy_packages(options, args):
+        return 0
+    else:
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

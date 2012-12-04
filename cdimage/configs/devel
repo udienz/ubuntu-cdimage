@@ -1,0 +1,3 @@
+debian-cd	bzr+ssh://bazaar.launchpad.net/~ubuntu-cdimage/debian-cd/ubuntu/
+germinate	bzr+ssh://bazaar.launchpad.net/+branch/germinate/
+britney		http://people.canonical.com/~cjwatson/bzr/britney/cdimage/

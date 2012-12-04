@@ -2,13 +2,18 @@
 
 BDIR=$TDIR/$CODENAME-$FULLARCH
 
-mkdir -p "$BDIR/CD1/casper"
+if [ "$CDIMAGE_LIVE" ]; then
+	DIR=casper
+else
+	DIR=install
+fi
+mkdir -p "$BDIR/CD1/$DIR"
 if [ -e "$LIVEIMAGES/$FULLARCH.cloop" ]; then
-	ln "$LIVEIMAGES/$FULLARCH.cloop" "$BDIR/CD1/casper/filesystem.cloop"
+	ln "$LIVEIMAGES/$FULLARCH.cloop" "$BDIR/CD1/$DIR/filesystem.cloop"
 elif [ -e "$LIVEIMAGES/$FULLARCH.squashfs" ]; then
-	ln "$LIVEIMAGES/$FULLARCH.squashfs" "$BDIR/CD1/casper/filesystem.squashfs"
+	ln "$LIVEIMAGES/$FULLARCH.squashfs" "$BDIR/CD1/$DIR/filesystem.squashfs"
 	if [ -e "$LIVEIMAGES/$FULLARCH.size" ]; then
-		ln "$LIVEIMAGES/$FULLARCH.size" "$BDIR/CD1/casper/filesystem.size"
+		ln "$LIVEIMAGES/$FULLARCH.size" "$BDIR/CD1/$DIR/filesystem.size"
 	fi
 else
 	echo "No filesystem for $FULLARCH!" >&2
@@ -19,23 +24,34 @@ fi
 for item in kernel initrd; do
 	for path in "$LIVEIMAGES/$FULLARCH.$item"-*; do
 		if [ -f "$path" ]; then
-			ln "$path" "$BDIR/CD1/casper/filesystem.${path#$LIVEIMAGES/$FULLARCH.}"
+			ln "$path" "$BDIR/CD1/$DIR/filesystem.${path#$LIVEIMAGES/$FULLARCH.}"
 		fi
 	done
 done
-ln "$LIVEIMAGES/$FULLARCH.manifest" "$BDIR/CD1/casper/filesystem.manifest" || true
+ln "$LIVEIMAGES/$FULLARCH.manifest" "$BDIR/CD1/$DIR/filesystem.manifest" || true
 if [ -e "$LIVEIMAGES/$FULLARCH.manifest-remove" ]; then
-	ln "$LIVEIMAGES/$FULLARCH.manifest-remove" "$BDIR/CD1/casper/filesystem.manifest-remove" || true
-else
-	ln "$LIVEIMAGES/$FULLARCH.manifest-desktop" "$BDIR/CD1/casper/filesystem.manifest-desktop" || true
+	ln "$LIVEIMAGES/$FULLARCH.manifest-remove" "$BDIR/CD1/$DIR/filesystem.manifest-remove" || true
+elif [ -e "$LIVEIMAGES/$FULLARCH.manifest-desktop" ]; then
+	ln "$LIVEIMAGES/$FULLARCH.manifest-desktop" "$BDIR/CD1/$DIR/filesystem.manifest-desktop" || true
 fi
 
 if [ "$PROJECT" = edubuntu ] && [ "$CDIMAGE_DVD" = 1 ]; then
 	case $ARCH in
 		amd64|i386)
-			mkdir -p "$BDIR/CD1/ltsp"
 			# LTSP is i386 for both architectures
-			ln "$LIVEIMAGES/$FULLARCH.ltsp-squashfs" "$BDIR/CD1/ltsp/i386.img"
+			# Starting with raring (13.04), all the Edubuntu squashfses now
+			# reside under casper/
+			if [ "$DIST" = "precise" ]; then
+				mkdir -p "$BDIR/CD1/ltsp"
+				ln "$LIVEIMAGES/$FULLARCH.ltsp-squashfs" \
+					"$BDIR/CD1/ltsp/i386.img"
+			else
+				mkdir -p "$BDIR/CD1/casper"
+				ln "$LIVEIMAGES/$FULLARCH.ltsp-squashfs" \
+					"$BDIR/CD1/casper/ltsp.squashfs"
+				ln "$LIVEIMAGES/$FULLARCH.server-squashfs" \
+					"$BDIR/CD1/casper/server.squashfs"
+			fi
 			;;
 	esac
 fi
@@ -54,25 +70,27 @@ initrd_decompressor () {
 	fi
 }
 
-# Extract the UUID from the casper initrd, if any.
-mkdir -p "$BDIR/uuid"
-for path in "$BDIR/CD1/casper/filesystem.initrd"-*; do (
-	[ -e "$path" ] || continue
-	cd "$BDIR/uuid"
-	decompressor="$(initrd_decompressor "$path")"
-	[ "$decompressor" ] || continue
-	"$decompressor" "$path" | cpio --quiet -id conf/uuid.conf
-	if [ -e conf/uuid.conf ]; then
-		mkdir -p "$BDIR/CD1/.disk"
-		mv conf/uuid.conf "$BDIR/CD1/.disk/casper-uuid-${path#$BDIR/CD1/casper/filesystem.initrd-}"
-	fi
-); done
+if [ "$CDIMAGE_LIVE" ]; then
+	# Extract the UUID from the casper initrd, if any.
+	mkdir -p "$BDIR/uuid"
+	for path in "$BDIR/CD1/casper/filesystem.initrd"-*; do (
+		[ -e "$path" ] || continue
+		cd "$BDIR/uuid"
+		decompressor="$(initrd_decompressor "$path")"
+		[ "$decompressor" ] || continue
+		"$decompressor" "$path" | cpio --quiet -id conf/uuid.conf
+		if [ -e conf/uuid.conf ]; then
+			mkdir -p "$BDIR/CD1/.disk"
+			mv conf/uuid.conf "$BDIR/CD1/.disk/casper-uuid-${path#$BDIR/CD1/casper/filesystem.initrd-}"
+		fi
+	); done
+fi
 
 # Release notes URL for use by Ubiquity. '${LANG}' will be replaced with the
 # installation locale code.
 RELEASE_NOTES=
 case $PROJECT in
-	ubuntu|kubuntu|edubuntu|xubuntu|gobuntu)
+	ubuntu|kubuntu|edubuntu|xubuntu|gobuntu|ubuntustudio)
 		case $DIST in
 			warty|hoary|breezy|dapper|edgy)
 				;;

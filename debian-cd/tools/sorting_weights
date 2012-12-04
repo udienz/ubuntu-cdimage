@@ -46,7 +46,7 @@ for type in udeb deb; do
 		fi
 	done
 done
-for file in ltsp/i386.img casper/filesystem.squashfs; do
+for file in casper/filesystem.squashfs install/filesystem.squashfs casper/ltsp.squashfs casper/server.squashfs ; do
 	if [ -e "$BDIR/CD$CD/$file" ]; then
 		echo "$file" >> "$BDIR/$CD.weights_in"
 	fi

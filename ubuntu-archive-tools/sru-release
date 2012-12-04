@@ -1,0 +1,236 @@
+#!/usr/bin/python
+
+# Copyright (C) 2011, 2012 Canonical Ltd.
+# Author: Martin Pitt <martin.pitt@canonical.com>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 3 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+'''Release a proposed stable release update.
+
+Copy packages from -proposed to -updates, and optionally to -security and the
+development release.
+
+USAGE:
+   sru-release [-s] [-d] <release> <package> [<package> ...]
+'''
+
+from __future__ import print_function
+
+from collections import defaultdict
+from functools import partial
+import optparse
+import sys
+
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib import urlopen
+
+from launchpadlib.launchpad import Launchpad
+
+
+def match_srubugs(changesfileurl):
+    '''match between bugs with verification- tag and bugs in changesfile'''
+
+    bugs = []
+
+    if changesfileurl is None:
+        return bugs
+
+    # Load changesfile
+    changelog = urlopen(changesfileurl)
+    bugnums = []
+    for l in changelog:
+        if l.startswith('Launchpad-Bugs-Fixed: '):
+            bugnums = l.split()[1:]
+            break
+
+    for b in bugnums:
+        try:
+            bugs.append(launchpad.bugs[int(b)])
+        except:
+            print('%s: bug %s does not exist or is not accessible' %
+                  (changesfileurl, b))
+
+    return bugs
+
+
+def update_sru_bug(bug):
+    '''Unsubscribe SRU team and comment on bug re: how to report regressions'''
+    m_subjects = [m.subject for m in bug.messages]
+    if 'Update Released' in m_subjects:
+        print('LP: #%s was not modified' % bug.id)
+        return
+    sru_team = launchpad.people['ubuntu-sru']
+    bug.unsubscribe(person=sru_team)
+    text = ("The verification of this Stable Release Update has completed "
+            "successfully and the package has now been released to "
+            "-updates.  Subsequently, the Ubuntu Stable Release Updates "
+            "Team is being unsubscribed and will not receive messages "
+            "about this bug report.  In the event that you encounter "
+            "a regression using the package from -updates please report "
+            "a new bug using ubuntu-bug and tag the bug report "
+            "regression-update so we can easily find any regresssions.")
+    bug.newMessage(subject="Update Released", content=text)
+    bug.lp_save()
+
+
+def get_versions(sourcename, pattern):
+    '''Get current package versions.
+
+    If pattern is True, return all versions for package names matching pattern.
+    If pattern is False, only return one result.
+
+    Return map pkgname -> {'release': version, 'updates': version,
+      'proposed': version, 'changesfile': url_of_proposed_changes,
+      'published': proposed_date}
+    '''
+    versions = defaultdict(dict)
+    matches = archive.getPublishedSources(source_name=sourcename,
+            exact_match=not pattern, status='Published', pocket='Proposed',
+            distro_series=series)
+    for match in matches:
+        # versions in all pockets
+        for pub in archive.getPublishedSources(
+            source_name=match.source_package_name, exact_match=True,
+            status='Published', distro_series=series):
+            versions[pub.source_package_name][pub.pocket.lower()] = (
+                pub.source_package_version)
+            if 'Proposed' in pub.pocket:
+                versions[pub.source_package_name]['changesfile'] = (
+                    pub.changesFileUrl())
+        # devel version
+        if devel_series:
+            for pub in archive.getPublishedSources(
+                source_name=match.source_package_name, exact_match=True,
+                status='Published', distro_series=devel_series):
+                if pub.pocket in ('Release', 'Proposed'):
+                    versions[pub.source_package_name]['devel'] = (
+                        pub.source_package_version)
+        else:
+            versions[match.source_package_name]['devel'] = None
+
+    return versions
+
+
+def release_package(package, copy_security, copy_devel, copy_release, no_act,
+                    pattern):
+    '''Release a package.'''
+
+    pkg_versions_map = get_versions(package, pattern)
+    if not pkg_versions_map:
+        sys.stderr.write('ERROR: No such package in -proposed, aborting\n')
+        sys.exit(1)
+
+    for pkg, versions in pkg_versions_map.iteritems():
+        print('--- Releasing %s ---' % pkg)
+        print('Proposed: %s' % versions['proposed'])
+        if 'security' in versions:
+            print('Security: %s' % versions['security'])
+        if 'updates' in versions:
+            print('Updates:  %s' % versions['updates'])
+        else:
+            print('Release:  %s' % versions.get('release'))
+        if copy_devel and 'devel' in versions:
+            print('Devel:    %s' % versions['devel'])
+
+        copy = partial(
+            archive.copyPackage, from_archive=archive, include_binaries=True,
+            source_name=pkg, version=versions['proposed'], auto_approve=True)
+
+        if copy_devel:
+            if ('devel' not in versions or
+                versions['devel'] in (
+                    versions.get('updates', 'notexisting'),
+                    versions['release'])):
+                if not no_act:
+                    copy(to_pocket='Proposed', to_series=devel_series.name)
+                print('Version in %s matches development series, '
+                      'copied to %s-proposed' % (release, devel_series.name))
+            else:
+                print('ERROR: Version in %s does not match development '
+                      'series, not copying' % release)
+
+        if no_act:
+            if copy_release:
+                print('Would copy to %s' % release)
+            else:
+                print('Would copy to %s-updates' % release)
+        else:
+            if copy_release:
+                # -proposed -> release
+                copy(to_pocket='Release', to_series=release)
+                print('Copied to %s' % release)
+            else:
+                # -proposed -> -updates
+                copy(to_pocket='Updates', to_series=release)
+                print('Copied to %s-updates' % release)
+                sru_bugs = match_srubugs(versions['changesfile'])
+                for sru_bug in sru_bugs:
+                    if 'verification-needed' not in sru_bug.tags:
+                        update_sru_bug(sru_bug)
+
+        # -proposed -> -security
+        if copy_security:
+            if no_act:
+                print('Would copy to %s-security' % release)
+            else:
+                copy(to_pocket='Security', to_series=release)
+                print('Copied to %s-security' % release)
+
+
+if __name__ == '__main__':
+    parser = optparse.OptionParser(
+        usage='usage: %prog [options] <release> <package> [<package> ...]')
+
+    parser.add_option(
+        '-l', '--launchpad', dest='launchpad_instance', default='production')
+    parser.add_option('-s', '--security', action='store_true', default=False,
+        help='Additionally copy to -security pocket')
+    parser.add_option('-d', '--devel', action='store_true', default=False,
+        help='Additionally copy to development release (only works if that '
+             'has the same version as <release>)')
+    parser.add_option('-r', '--release', action='store_true', default=False,
+        help='Copy to release pocket instead of -updates (useful for staging '
+             'uploads in development release)')
+    parser.add_option('-n', '--no-act', action='store_true', default=False,
+        help='Only perform checks, but do not actually copy packages')
+    parser.add_option('-p', '--pattern', action='store_true', default=False,
+        help='Treat package names as patterns, not exact matches')
+
+    options, args = parser.parse_args()
+
+    if len(args) < 2:
+        parser.error(
+            'You must specify a release and source package(s), see --help')
+
+    if options.release and (options.security or options.devel):
+        parser.error('-r and -s/-d are mutually exclusive, see --help')
+
+    release = args.pop(0)
+    packages = args
+
+    launchpad = Launchpad.login_with(
+        'ubuntu-archive-tools', options.launchpad_instance, version='devel')
+    ubuntu = launchpad.distributions['ubuntu']
+    series = ubuntu.getSeries(name_or_version=release)
+    devel_series = ubuntu.current_series
+    if not devel_series:
+        sys.stderr.write(
+            'WARNING: No current development series, -d will not work\n')
+        devel_series = None
+    archive = ubuntu.getArchive(name='primary')
+
+    for package in packages:
+        release_package(package, options.security, options.devel,
+                options.release, options.no_act, options.pattern)

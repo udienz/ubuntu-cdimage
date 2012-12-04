@@ -1,0 +1,235 @@
+#! /usr/bin/python
+
+import HTMLParser
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.join(sys.path[0], os.pardir, "lib"))
+from cdimage.config import config
+from cdimage.tree import DailyTree, DailyTreePublisher
+
+
+warnings = {}
+send_mail = True
+mailer = None
+mailer_stdin = None
+
+
+class BritneyParser(HTMLParser.HTMLParser):
+    STATE_BEGIN = 0
+    STATE_SEEN_INTRO_P = 1
+    STATE_SEEN_INTRO_TEXT = 2
+    STATE_UNINST_LIST = 3
+    STATE_UNINST_LIST_ITEM = 4
+    STATE_UNINST_LIST_ARCH_LIST = 5
+    STATE_UNINST_LIST_ARCH_ITEM = 6
+    STATE_DONE = 7
+
+    def __init__(self):
+        HTMLParser.HTMLParser.__init__(self)
+        self.state = self.STATE_BEGIN
+        self.formatted = ''
+
+    def handle_starttag(self, tag, attrs):
+        if self.state == self.STATE_BEGIN:
+            if tag == 'p':
+                self.state = self.STATE_SEEN_INTRO_P
+        elif self.state == self.STATE_SEEN_INTRO_TEXT:
+            if tag == 'ul':
+                self.state = self.STATE_UNINST_LIST
+        elif self.state == self.STATE_UNINST_LIST:
+            if tag == 'li':
+                self.state = self.STATE_UNINST_LIST_ITEM
+        elif self.state == self.STATE_UNINST_LIST_ITEM:
+            if tag == 'ul':
+                self.state = self.STATE_UNINST_LIST_ARCH_LIST
+        elif self.state == self.STATE_UNINST_LIST_ARCH_LIST:
+            if tag == 'li':
+                self.state = self.STATE_UNINST_LIST_ARCH_ITEM
+
+    def handle_endtag(self, tag):
+        if self.state in (self.STATE_UNINST_LIST, self.STATE_UNINST_LIST_ITEM):
+            if tag == 'ul':
+                self.state = self.STATE_DONE
+        elif self.state in (self.STATE_UNINST_LIST_ARCH_LIST,
+                            self.STATE_UNINST_LIST_ARCH_ITEM):
+            if tag == 'ul':
+                self.state = self.STATE_UNINST_LIST_ITEM
+
+    def handle_data(self, data):
+        if self.state == self.STATE_SEEN_INTRO_P:
+            if data.startswith('First, uninstallable packages:'):
+                self.state = self.STATE_SEEN_INTRO_TEXT
+        elif self.state == self.STATE_UNINST_LIST_ITEM:
+            if data:
+                self.formatted += data.rstrip() + '\n'
+        elif self.state == self.STATE_UNINST_LIST_ARCH_ITEM:
+            if data:
+                self.formatted += '  * ' + data.rstrip() + '\n'
+
+
+def warn(project, image, message):
+    if project not in warnings:
+        warnings[project] = {}
+    if image not in warnings[project]:
+        warnings[project][image] = []
+    warnings[project][image].append(message)
+
+
+def project_title(project):
+    if project == 'ubuntu-server':
+        return 'Ubuntu Server'
+    elif project == 'jeos':
+        return 'Ubuntu JeOS'
+    elif project == 'ubuntustudio':
+        return 'Ubuntu Studio'
+    elif project == 'ubuntu-netbook':
+        return 'Ubuntu Netbook'
+    elif project == 'ubuntu-headless':
+        return 'Ubuntu Headless'
+    elif project == 'kubuntu-active':
+        return 'Kubuntu Active'
+    elif project == 'ubuntu-moblin-remix':
+        return 'Ubuntu Moblin Remix'
+    else:
+        return project.title()
+
+
+def get_notify_addresses(project=None):
+    path = os.path.join(config.root, 'production', 'notify-addresses')
+    if not os.path.exists(path):
+        path = os.path.join(config.root, 'etc', 'notify-addresses')
+    if not os.path.exists(path):
+        return []
+    with open(path) as fp:
+        all_addresses = []
+        for line in fp:
+            this_project, addresses = line.split(None, 1)
+            if (this_project == 'ALL' or
+                (project is not None and this_project == project)):
+                all_addresses.extend(addresses.split())
+        return all_addresses
+
+
+def get_warnings(project):
+    global warnings
+    lines = []
+    if project in warnings:
+        for image in warnings[project]:
+            if lines and warnings[project][image]:
+                lines.append('')
+            for message in warnings[project][image]:
+                lines.append("%s/%s: %s" % (project, image, message))
+    return '\n'.join(lines)
+
+
+def get_all_warnings(projects):
+    texts = []
+    for project in projects:
+        text = get_warnings(project)
+        if text:
+            texts.append(text)
+    return '\n\n\n'.join(texts)
+
+
+def create_mail(subject, recipients, body):
+    if send_mail:
+        mailer_args = ['mail', '-s', subject,
+                       '-a', 'X-Generated-By: daily-checks.py']
+        mailer_args.extend(recipients)
+        mailer = subprocess.Popen(mailer_args, stdin=subprocess.PIPE)
+        print >>mailer.stdin, body,
+        mailer.stdin.close()
+        mailer.wait()
+    else:
+        print "Would send mail to:", ', '.join(recipients)
+        print
+        print "Subject: %s" % subject
+        print "X-Generated-By: daily-checks.py"
+        print
+        print body
+
+
+def send_warnings(projects):
+    releasers = get_notify_addresses()
+    all_warnings = get_all_warnings(projects)
+    if all_warnings == '':
+        all_warnings = 'No problems found!'
+    create_mail('Daily CD health checks', releasers,
+                """\
+This is a daily health check report on all CD images.
+If you have any questions, contact Colin Watson <cjwatson@ubuntu.com>.
+
+%s
+""" % all_warnings)
+
+    for project in projects:
+        owners = [owner for owner in get_notify_addresses(project)
+                        if owner not in releasers]
+        if owners:
+            these_warnings = get_warnings(project)
+            if these_warnings == '':
+                continue
+            create_mail('%s daily CD health check' % project_title(project),
+                        owners,
+                        """\
+This is a daily health check report on the %s CD images.
+If you have any questions, contact Colin Watson <cjwatson@ubuntu.com>.
+
+%s
+""" % (project_title(project), these_warnings))
+
+
+if len(sys.argv) > 1 and sys.argv[1] == '--stdout':
+    send_mail = False
+
+projects = ('ubuntu', 'ubuntu-server', 'kubuntu', 'edubuntu', 'xubuntu',
+            'ubuntustudio', 'ubuntu-netbook', 'kubuntu-netbook',
+            'ubuntu-moblin-remix')
+
+tree = DailyTree(config)
+
+for project in projects:
+    config["PROJECT"] = project
+    for image in 'daily-live', 'daily', 'dvd':
+        publisher = DailyTreePublisher(tree, image)
+        curdir = os.path.join(publisher.publish_base, 'current')
+        if not os.path.exists(curdir):
+            continue
+        files = sorted(os.listdir(curdir))
+        sizelimit = publisher.size_limit
+        for oversized in filter(lambda x: x.endswith('.OVERSIZED'), files):
+            iso = "%s.iso" % oversized[:-10]
+            try:
+                size = os.stat(os.path.join(curdir, iso)).st_size
+            except OSError:
+                continue
+            if size > sizelimit:
+                warn(project, image, "%s oversized by %d bytes (%d)" %
+                                     (iso, size - sizelimit, size))
+
+        if project == 'xubuntu':
+            for manifest in filter(lambda x: x.endswith('.list') or
+                                             x.endswith('.manifest'), files):
+                if manifest.endswith('.list'):
+                    iso = manifest[:-5]
+                else:
+                    iso = manifest[:-9]
+                with open(os.path.join(curdir, manifest)) as manifest_file:
+                    if 'openoffice.org-core' in manifest_file.read():
+                        warn(project, image,
+                             "%s contains openoffice.org-core" % iso)
+
+    for image in 'daily-live', 'daily', 'dvd':
+        publisher = DailyTreePublisher(tree, image)
+        curdir = os.path.join(publisher.publish_base, 'current')
+        if os.path.exists(os.path.join(curdir, 'report.html')):
+            with open(os.path.join(curdir, 'report.html')) as report:
+                parser = BritneyParser()
+                parser.feed(report.read())
+            if parser.formatted != '':
+                warn(project, image, "Uninstallable packages:\n\n%s" %
+                                     parser.formatted.rstrip('\n'))
+
+send_warnings(projects)

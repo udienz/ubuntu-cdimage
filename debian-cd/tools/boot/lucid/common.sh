@@ -117,5 +117,23 @@ initrd_suffix() {
     fi
 }
 
+backport_kernel_version() {
+    case $backport in
+	maverick)
+	    echo 2.6.35
+	    ;;
+	natty)
+	    echo 2.6.38
+	    ;;
+	oneiric)
+	    echo 3.0
+	    ;;
+	*)
+	    echo "Unknown backport kernel '$backport'!" >&2
+	    exit 1
+	    ;;
+    esac
+}
+
 HUMANPROJECT="$(echo "$CAPPROJECT" | sed 's/-/ /g')"
 

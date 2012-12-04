@@ -4,7 +4,12 @@ set -e
 export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
 . "$CDIMAGE_ROOT/etc/config"
 
-GERMINATE_OUT="$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/germinate"
+if [ -x "$CDIMAGE_ROOT/germinate/bin/germinate" ]; then
+    GERMINATE_PATH="$CDIMAGE_ROOT/germinate/bin/germinate"
+else
+    GERMINATE_PATH="$CDIMAGE_ROOT/germinate/germinate.py"
+fi
+GERMINATE_OUT="$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE/germinate"
 # set to the empty string instead to use old-style seed checkouts
 GERMINATE_BZR=--bzr
 
@@ -22,9 +27,9 @@ if [ "$IMAGE_TYPE" = source ]; then
 fi
 
 if [ "$GERMINATE_BZR" ]; then
-	SEED_SOURCE=http://bazaar.launchpad.net/~ubuntu-core-dev/ubuntu-seeds/
+	SEED_SOURCE=http://altair.udienz.web.id/seed/
 	case $PROJECT in
-		kubuntu|kubuntu-mobile)
+		kubuntu|kubuntu-active)
 			if dist_ge oneiric; then
 				SEED_SOURCE="http://bazaar.launchpad.net/~kubuntu-dev/ubuntu-seeds/,$SEED_SOURCE"
 			fi
@@ -53,8 +58,11 @@ if [ "$LOCAL_SEEDS" ]; then
 	GERMINATE_BZR=
 fi
 
-GERMINATE_DISTS="${GERMINATE_DISTS:-$DIST,$DIST-security,$DIST-updates}"
-#GERMINATE_DISTS="${GERMINATE_DISTS:-$DIST,$DIST-security,$DIST-updates,$DIST-proposed}"
+if [ "$DIST" = precise ]; then
+	GERMINATE_DISTS="${GERMINATE_DISTS:-$DIST,$DIST-security,$DIST-updates,$DIST-proposed}"
+else
+	GERMINATE_DISTS="${GERMINATE_DISTS:-$DIST,$DIST-security,$DIST-updates}"
+fi
 
 case $PROJECT in
 	ubuntu-server)
@@ -67,8 +75,8 @@ case $PROJECT in
 	ubuntu-netbook)
 		GERMINATE_SEED_DIST="netbook.$DIST"
 		;;
-	kubuntu-mobile)
-		GERMINATE_SEED_DIST="kubuntu-mobile.$DIST"
+	kubuntu-active)
+		GERMINATE_SEED_DIST="kubuntu-active.$DIST"
 		;;
 	*)
 		GERMINATE_SEED_DIST="$PROJECT.$DIST"
@@ -92,7 +100,7 @@ mkindex () {
 	done | gzip -c > "$GERMINATE_OUT/$target"
 }
 
-mkemptydir "$GERMINATE_OUT/$DIST"
+mkemptydir "$GERMINATE_OUT"
 
 for arch in $ARCHES; do
 	echo "Germinating for $DIST/$arch ..."
@@ -122,12 +130,12 @@ for arch in $ARCHES; do
 	done
 	IFS="$IFS_SAVE"
 
-	mkemptydir "$GERMINATE_OUT/$DIST/$arch"
-	cd "$GERMINATE_OUT/$DIST/$arch"
+	mkemptydir "$GERMINATE_OUT/$arch"
+	cd "$GERMINATE_OUT/$arch"
 	if [ "$GERMINATE_HINTS" ] && [ -f "$GERMINATE_HINTS" ]; then
 		cp -a "$GERMINATE_HINTS" hints
 	fi
-	"$CDIMAGE_ROOT/germinate/germinate.py" --seed-source "$SEED_SOURCE" --mirror "file://$GERMINATE_OUT/" --seed-dist "$GERMINATE_SEED_DIST" --dist "$GERMINATE_DISTS" --arch "$cpuarch" --components main --no-rdepends $GERMINATE_BZR
+	"$GERMINATE_PATH" --seed-source "$SEED_SOURCE" --mirror "file://$GERMINATE_OUT/" --seed-dist "$GERMINATE_SEED_DIST" --dist "$GERMINATE_DISTS" --arch "$cpuarch" --components main --no-rdepends $GERMINATE_BZR
 	cp -a structure ../STRUCTURE
 
 	if [ "$DIST" = breezy ]; then
@@ -141,6 +149,6 @@ for arch in $ARCHES; do
 			EXTRAS="${EXTRAS:+$EXTRAS,}desktop/$pkg"
 			echo "$pkg" >> ship.acsets
 		done
-		"$CDIMAGE_ROOT/germinate/germinate.py" --seed-source "$SEED_SOURCE" --mirror "file://$GERMINATE_OUT/" --seed-dist "$GERMINATE_SEED_DIST" --dist "$GERMINATE_DISTS" --arch "$cpuarch" --components main --no-rdepends ${EXTRAS:+--seed-packages "$EXTRAS"} $GERMINATE_BZR
+		"$GERMINATE_PATH" --seed-source "$SEED_SOURCE" --mirror "file://$GERMINATE_OUT/" --seed-dist "$GERMINATE_SEED_DIST" --dist "$GERMINATE_DISTS" --arch "$cpuarch" --components main --no-rdepends ${EXTRAS:+--seed-packages "$EXTRAS"} $GERMINATE_BZR
 	fi
 done

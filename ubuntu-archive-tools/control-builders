@@ -1,0 +1,101 @@
+#!/usr/bin/python
+# Enable/disable builder machines. This is useful to ensure that a particular
+# build (such as LibreOffice) lands on a particular (set of) builders.
+#
+# Copyright (C) 2012  Canonical Ltd.
+# Author: Martin Pitt <martin.pitt@ubuntu.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 3 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import sys
+import argparse
+
+from launchpadlib.launchpad import Launchpad
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="control Launchpad builders")
+    parser.add_argument("action", choices=["list", "manual", "auto"],
+                        help="operation: list builders and show their status, set them to manual or auto")
+    parser.add_argument("builder", nargs="*",
+                        help="list of builders to control; can be - to read from stdin, with only the first word from each line being considered; with that you can grep the output of 'list' and pipe it back into control-builders to effect a selection of builders")
+    parser.add_argument("-l", "--launchpad", default="production")
+    args = parser.parse_args()
+
+    if not args.builder and args.action != "list":
+        parser.error("need at least one builder to effect")
+
+    return args
+
+def select(builders, selections):
+    """Return selected builders"""
+
+    # expand reading from stdin
+    if '-' in selections:
+        selections.remove('-')
+        for line in sys.stdin:
+            selections.append(line.split()[0])
+
+    selected = []
+    for b in builders:
+        if b.name in selections:
+            selected.append(b)
+            selections.remove(b.name)
+
+    if selections:
+        sys.stderr.write('WARNING! Ignoring unknown builders: %s\n' % ' '.join(selections))
+
+    return selected
+
+def action_list(b):
+    """list builder status"""
+
+    if b.failnotes:
+        fail_notes = b.failnotes.splitlines()[0].strip()
+    else:
+        fail_notes = ''
+    print("%-15s %-5s %-9s %-6s %s" % (
+          b.name,
+          b.virtualized and 'ppa' or 'distro',
+          b.active and 'active' or 'disabled',
+          b.manual and 'manual' or 'auto',
+          b.builderok and 'ok' or 'fail (%s)' % fail_notes,
+         ))
+
+def action_manual(b):
+    """switch builder to manual"""
+
+    b.manual = True
+    b.lp_save()
+
+def action_auto(b):
+    """switch builder to auto"""
+
+    b.manual = False
+    b.lp_save()
+
+#
+# main
+#
+
+args = parse_args()
+
+launchpad = Launchpad.login_with("control-builder", args.launchpad)
+builders = launchpad.builders
+
+if args.builder:
+    builders = select(builders, args.builder)
+
+command = globals()["action_" + args.action]
+
+for builder in builders:
+    command(builder)

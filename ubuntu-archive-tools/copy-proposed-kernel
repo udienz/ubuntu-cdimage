@@ -1,0 +1,61 @@
+#!/usr/bin/python
+
+# Copyright (C) 2011, 2012  Canonical Ltd.
+# Author: Martin Pitt <martin.pitt@canonical.com>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 3 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+'''Copy a kernel from the kernel team's PPA to -proposed.
+
+USAGE:
+   copy-proposed-kernel <release> <sourcepackage>
+'''
+
+from __future__ import print_function
+
+import sys
+
+from launchpadlib.launchpad import Launchpad
+
+
+if len(sys.argv) != 3:
+    sys.stderr.write('Usage: %s <release> <sourcepackage>\n' % sys.argv[0])
+    sys.exit(1)
+(release, pkg) = sys.argv[1:]
+
+launchpad = Launchpad.login_with('ubuntu-archive-tools', 'production',
+        version='devel')
+ubuntu = launchpad.distributions['ubuntu']
+distro_series = ubuntu.getSeries(name_or_version=release)
+kernel_ppa = launchpad.people['canonical-kernel-team'].getPPAByName(name='ppa')
+
+# get current version in PPA for that series
+versions = kernel_ppa.getPublishedSources(source_name=pkg, exact_match=True,
+        status='Published', pocket='Release', distro_series=distro_series)
+assert versions.total_size == 1
+version = versions[0].source_package_version
+
+include_binaries = "-signed" not in pkg
+
+ubuntu.getArchive(name='primary').copyPackage(from_archive=kernel_ppa,
+        include_binaries=include_binaries, source_name=pkg, to_series=release,
+        to_pocket='proposed', version=version, auto_approve=True)
+
+# TODO: adjust this script to use find-bin-overrides or rewrite
+# find-bin-overrides to use lpapi and use it here.
+print('''
+IMPORTANT: Please verify the overrides are correct for this source package.
+Failure to do so may result in uninstallability when it is ultimately copied to
+-updates/-security. lp:ubuntu-qa-tools/security-tools/find-bin-overrides can
+help with this.
+''')

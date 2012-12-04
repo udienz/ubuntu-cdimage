@@ -1,0 +1,259 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+"""Update list files from the Wiki."""
+
+# Copyright (c) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+#               Canonical Ltd.
+#
+# Germinate is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option) any
+# later version.
+#
+# Germinate is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Germinate; see the file COPYING.  If not, write to the Free
+# Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
+import os
+import shutil
+import sys
+import optparse
+import logging
+
+try:
+    import imp
+    imp.find_module('germinate.germinator')
+except ImportError:
+    # Temporary, until the module API is properly public.
+    sys.path.insert(0, '/usr/lib/germinate')
+    try:
+        imp.find_module('germinate.germinator')
+    except ImportError:
+        # Running from build tree?
+        sys.path.insert(0, os.path.join(sys.path[1], os.pardir))
+
+from germinate.germinator import Germinator, pretty_logging
+import germinate.archive
+import germinate.defaults
+from germinate.seeds import Seed, SeedError, SeedStructure
+import germinate.version
+
+
+def parse_options():
+    parser = optparse.OptionParser(prog='germinate',
+                                   version=germinate.version.VERSION)
+    parser.add_option('-v', '--verbose', dest='verbose', action='store_true',
+                      default=False,
+                      help='be more verbose when processing seeds')
+    parser.add_option('-S', '--seed-source', dest='seeds', metavar='SOURCE',
+                      help='fetch seeds from SOURCE (default: %s)' %
+                           germinate.defaults.seeds)
+    parser.add_option('-s', '--seed-dist', dest='release', metavar='DIST',
+                      default=germinate.defaults.release,
+                      help='fetch seeds for distribution DIST '
+                           '(default: %default)')
+    parser.add_option('-m', '--mirror', dest='mirrors', action='append',
+                      metavar='MIRROR',
+                      help='get package lists from MIRROR (default: %s)' %
+                           germinate.defaults.mirror)
+    parser.add_option('--source-mirror', dest='source_mirrors',
+                      action='append', metavar='MIRROR',
+                      help='get source package lists from mirror '
+                           '(default: value of --mirror)')
+    parser.add_option('-d', '--dist', dest='dist',
+                      default=germinate.defaults.dist,
+                      help='operate on distribution DIST (default: %default)')
+    parser.add_option('-a', '--arch', dest='arch',
+                      default=germinate.defaults.arch,
+                      help='operate on architecture ARCH (default: %default)')
+    parser.add_option('-c', '--components', dest='components',
+                      default='main,restricted', metavar='COMPS',
+                      help='operate on components COMPS (default: %default)')
+    parser.add_option('--bzr', dest='bzr', action='store_true', default=False,
+                      help='fetch seeds using bzr (requires bzr to be '
+                           'installed)')
+    parser.add_option('--cleanup', dest='cleanup', action='store_true',
+                      default=False,
+                      help="don't cache Packages or Sources files")
+    parser.add_option('--no-rdepends', dest='want_rdepends',
+                      action='store_false', default=True,
+                      help='disable reverse-dependency calculations')
+    parser.add_option('--no-installer', dest='installer', action='store_false',
+                      default=True,
+                      help='do not consider debian-installer udeb packages')
+    parser.add_option('--seed-packages', dest='seed_packages',
+                      metavar='PARENT/PKG,PARENT/PKG,...',
+                      help='treat each PKG as a seed by itself, inheriting '
+                           'from PARENT')
+    options, _ = parser.parse_args()
+
+    if options.seeds is None:
+        if options.bzr:
+            options.seeds = germinate.defaults.seeds_bzr
+        else:
+            options.seeds = germinate.defaults.seeds
+    options.seeds = options.seeds.split(',')
+
+    if options.mirrors is None:
+        options.mirrors = [germinate.defaults.mirror]
+
+    def canonicalise_mirror(mirror):
+        if not mirror.endswith('/'):
+            mirror += '/'
+        return mirror
+
+    options.mirrors = map(canonicalise_mirror, options.mirrors)
+    if options.source_mirrors is not None:
+        options.source_mirrors = map(canonicalise_mirror,
+                                     options.source_mirrors)
+
+    options.dist = options.dist.split(',')
+    options.components = options.components.split(',')
+    if options.seed_packages is None:
+        options.seed_packages = []
+    else:
+        options.seed_packages = options.seed_packages.split(',')
+
+    return options
+
+
+def main():
+    options = parse_options()
+
+    logger = logging.getLogger()
+    if options.verbose:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(Germinator.PROGRESS)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('%(levelname)s%(message)s'))
+    logger.addHandler(handler)
+    pretty_logging()
+
+    g = Germinator(options.arch)
+
+    archive = germinate.archive.TagFile(
+        options.dist, options.components, options.arch,
+        options.mirrors, source_mirrors=options.source_mirrors,
+        installer_packages=options.installer, cleanup=options.cleanup)
+    g.parseArchive(archive)
+
+    if os.path.isfile("hints"):
+        with open("hints") as hints:
+            g.parseHints(hints)
+
+    try:
+        with Seed(options.seeds, options.release, "blacklist",
+                  options.bzr) as blacklist:
+            g.parseBlacklist(blacklist)
+    except SeedError:
+        pass
+
+    try:
+        structure = SeedStructure(options.release, options.seeds, options.bzr)
+        for seed_package in options.seed_packages:
+            parent, pkg = seed_package.split('/')
+            structure.add(pkg, [" * " + pkg], parent)
+        g.plantSeeds(structure)
+    except SeedError:
+        sys.exit(1)
+
+    g.prune()
+    g.grow()
+    g.addExtras()
+    if options.want_rdepends:
+        g.reverseDepends()
+
+    for seedname in structure.names:
+        g.writeList(seedname, seedname,
+                    set(g.seed[seedname]) | set(g.seedrecommends[seedname]) |
+                    set(g.depends[seedname]))
+        g.writeList(seedname, seedname + ".seed",
+                    g.seed[seedname])
+        g.writeList(seedname, seedname + ".seed-recommends",
+                    g.seedrecommends[seedname])
+        g.writeList(seedname, seedname + ".depends",
+                    g.depends[seedname])
+        g.writeList(seedname, seedname + ".build-depends",
+                    g.build_depends[seedname])
+
+        if seedname != "extra" and seedname in structure.texts:
+            g.writeSeedText(seedname + ".seedtext", structure.texts[seedname])
+            g.writeSourceList(seedname + ".sources",
+                              g.sourcepkgs[seedname])
+        g.writeSourceList(seedname + ".build-sources",
+                          g.build_sourcepkgs[seedname])
+
+    all_bins = set()
+    sup_bins = set()
+    all_srcs = set()
+    sup_srcs = set()
+    for seedname in structure.names:
+        if seedname == "extra":
+            continue
+
+        all_bins.update(g.seed[seedname])
+        all_bins.update(g.seedrecommends[seedname])
+        all_bins.update(g.depends[seedname])
+        all_bins.update(g.build_depends[seedname])
+        all_srcs.update(g.sourcepkgs[seedname])
+        all_srcs.update(g.build_sourcepkgs[seedname])
+
+        if seedname == g.supported:
+            sup_bins.update(g.seed[seedname])
+            sup_bins.update(g.seedrecommends[seedname])
+            sup_bins.update(g.depends[seedname])
+            sup_srcs.update(g.sourcepkgs[seedname])
+
+        # Only include those build-dependencies that aren't already in the
+        # dependency outputs for inner seeds of supported. This allows
+        # supported+build-depends to be usable as an "everything else"
+        # output.
+        build_depends = dict.fromkeys(g.build_depends[seedname], True)
+        build_sourcepkgs = dict.fromkeys(g.build_sourcepkgs[seedname], True)
+        for seed in structure.innerSeeds(g.supported):
+            build_depends.update(dict.fromkeys(g.seed[seed], False))
+            build_depends.update(dict.fromkeys(g.seedrecommends[seed], False))
+            build_depends.update(dict.fromkeys(g.depends[seed], False))
+            build_sourcepkgs.update(dict.fromkeys(g.sourcepkgs[seed], False))
+        sup_bins.update([k for (k, v) in build_depends.iteritems() if v])
+        sup_srcs.update([k for (k, v) in build_sourcepkgs.iteritems() if v])
+
+    g.writeList("all", "all", all_bins)
+    g.writeSourceList("all.sources", all_srcs)
+
+    g.writeList("all", "%s+build-depends" % g.supported, sup_bins)
+    g.writeSourceList("%s+build-depends.sources" % g.supported, sup_srcs)
+
+    g.writeList("all", "all+extra", g.all)
+    g.writeSourceList("all+extra.sources", g.all_srcs)
+
+    g.writeProvidesList("provides")
+
+    structure.write("structure")
+    structure.writeDot("structure.dot")
+
+    if os.path.exists("rdepends"):
+        shutil.rmtree("rdepends")
+    if options.want_rdepends:
+        os.mkdir("rdepends")
+        os.mkdir(os.path.join("rdepends", "ALL"))
+        for pkg in g.all:
+            dirname = os.path.join("rdepends", g.packages[pkg]["Source"])
+            if not os.path.exists(dirname):
+                os.mkdir(dirname)
+
+            g.writeRdependList(os.path.join(dirname, pkg), pkg)
+            os.symlink(os.path.join("..", g.packages[pkg]["Source"], pkg),
+                       os.path.join("rdepends", "ALL", pkg))
+
+    g.writeBlacklisted("blacklisted")
+
+if __name__ == "__main__":
+    main()

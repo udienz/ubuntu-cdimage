@@ -7,7 +7,7 @@ DIR="$1/CD1"
 SOURCEDIR="$MIRROR/dists/$CODENAME/main/dist-upgrader-all/current"
 TARGETDIR="$DIR/dists/$CODENAME/main/dist-upgrader/binary-all"
 
-if [ -d "$SOURCEDIR" ]; then
+if ls "$SOURCEDIR/$CODENAME"* >/dev/null 2>&1; then
     mkdir -p "$TARGETDIR"
     # copy upgrade tarball + signature
     cp -a "$SOURCEDIR/$CODENAME"* "$TARGETDIR"

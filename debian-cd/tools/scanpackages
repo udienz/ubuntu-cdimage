@@ -152,16 +152,15 @@ if [ -e "$MIRROR/dists/$DI_CODENAME/main/debian-installer" ]; then
     apt-ftparchive --no-contents generate $PREFIX.generate-binary-debian-installer
 fi
 
-if [ "$PROJECT" != ubuntu-moblin-remix ]; then
-if [ "$CDIMAGE_LIVE" = 1 ] && [ "$CDIMAGE_DVD" != 1 ]; then
-    for index in $(find "$BDIR"/CD* -name Packages -not -path '*/main/binary-*/Packages'); do
+if [ "$PROJECT" != ubuntu-moblin-remix ] && \
+   [ "$CDIMAGE_LIVE" = 1 ] && [ "$CDIMAGE_DVD" != 1 ]; then
+    for index in $(find "$BDIR"/CD* -path '*/debian-installer/binary-*/Packages'); do
 	if [ ! -s "$index" ]; then
 	    rm -f "$index"*
 	    rm -f "${index%/*}/Release"
 	    rmdir -p --ignore-fail-on-non-empty "${index%/*}"
 	fi
     done
-fi
 fi
 
 fi ## END "$1" = "install"

@@ -1,0 +1,433 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+
+# Copyright (c) 2004, 2005, 2006, 2007, 2008, 2009, 2011 Canonical Ltd.
+# Copyright (c) 2006 Gustavo Franco
+#
+# This file is part of Germinate.
+#
+# Germinate is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option) any
+# later version.
+#
+# Germinate is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Germinate; see the file COPYING.  If not, write to the Free
+# Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
+# TODO:
+# - Exclude essential packages from dependencies
+
+import sys
+import re
+import os
+import optparse
+import logging
+import ConfigParser
+import subprocess
+
+try:
+    import imp
+    imp.find_module('germinate.germinator')
+except ImportError:
+    # Temporary, until the module API is properly public.
+    sys.path.insert(0, '/usr/lib/germinate')
+    try:
+        imp.find_module('germinate.germinator')
+    except ImportError:
+        # Running from build tree?
+        sys.path.insert(0, os.path.join(sys.path[1], os.pardir))
+
+from germinate.germinator import Germinator, pretty_logging
+import germinate.archive
+from germinate.seeds import Seed, SeedError, SeedStructure
+import germinate.version
+
+__pychecker__ = 'maxlocals=80'
+
+
+def error_exit(message):
+    print >>sys.stderr, "%s: %s" % (sys.argv[0], message)
+    sys.exit(1)
+
+
+def parse_options():
+    description = '''\
+Update metapackage lists for distribution 'dist' as defined in
+update.cfg.'''
+
+    parser = optparse.OptionParser(prog='germinate-update-metapackage',
+                                   usage='%prog [options] [dist]',
+                                   version=germinate.version.VERSION,
+                                   description=description)
+    parser.add_option('-o', '--output-directory', dest='outdir',
+                      default='.', metavar='DIR',
+                      help='output in specific directory')
+    parser.add_option('--nodch', dest='nodch', action='store_true',
+                      default=False,
+                      help="don't modify debian/changelog")
+    parser.add_option('--bzr', dest='bzr', action='store_true', default=False,
+                      help='fetch seeds using bzr (requires bzr to be '
+                           'installed)')
+    return parser.parse_args()
+
+
+def main():
+    options, args = parse_options()
+
+    if not os.path.exists('debian/control'):
+        error_exit('must be run from the top level of a source package')
+    this_source = None
+    with open('debian/control') as control:
+        for line in control:
+            if line.startswith('Source:'):
+                this_source = line[7:].strip()
+                break
+            elif line == '':
+                break
+    if this_source is None:
+        error_exit('cannot find Source: in debian/control')
+    if not this_source.endswith('-meta'):
+        error_exit('source package name must be *-meta')
+    metapackage = this_source[:-5]
+
+    print "[info] Initialising %s-* package lists update..." % metapackage
+
+    config = ConfigParser.SafeConfigParser()
+    with open('update.cfg') as config_file:
+        config.readfp(config_file)
+
+    if len(args) > 0:
+        dist = args[0]
+    else:
+        dist = config.get('DEFAULT', 'dist')
+
+    seeds = config.get(dist, 'seeds').split()
+    try:
+        output_seeds = config.get(dist, 'output_seeds').split()
+    except ConfigParser.NoOptionError:
+        output_seeds = list(seeds)
+    architectures = config.get(dist, 'architectures').split()
+    try:
+        archive_base_default = config.get(dist, 'archive_base/default')
+        archive_base_default = re.split(r'[, ]+', archive_base_default)
+    except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+        archive_base_default = None
+
+    archive_base = {}
+    for arch in architectures:
+        try:
+            archive_base[arch] = config.get(dist, 'archive_base/%s' % arch)
+            archive_base[arch] = re.split(r'[, ]+', archive_base[arch])
+        except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+            if archive_base_default is not None:
+                archive_base[arch] = archive_base_default
+            else:
+                error_exit('no archive_base configured for %s' % arch)
+
+    if options.bzr and config.has_option("%s/bzr" % dist, 'seed_base'):
+        seed_base = config.get("%s/bzr" % dist, 'seed_base')
+    else:
+        seed_base = config.get(dist, 'seed_base')
+    seed_base = re.split(r'[, ]+', seed_base)
+    if options.bzr and config.has_option("%s/bzr" % dist, 'seed_dist'):
+        seed_dist = config.get("%s/bzr" % dist, 'seed_dist')
+    elif config.has_option(dist, 'seed_dist'):
+        seed_dist = config.get(dist, 'seed_dist')
+    else:
+        seed_dist = dist
+    components = config.get(dist, 'components').split()
+
+    def seed_packages(germinator_list, seed, seed_text):
+        if config.has_option(dist, "seed_map/%s" % seed):
+            mapped_seeds = config.get(dist, "seed_map/%s" % seed).split()
+        else:
+            mapped_seeds = []
+            task_seeds_re = re.compile('^Task-Seeds:\s*(.*)', re.I)
+            for line in seed_text:
+                task_seeds_match = task_seeds_re.match(line)
+                if task_seeds_match is not None:
+                    mapped_seeds = task_seeds_match.group(1).split()
+                    break
+            if seed not in mapped_seeds:
+                mapped_seeds.append(seed)
+        packages = []
+        for mapped_seed in mapped_seeds:
+            packages.extend(germinator_list[mapped_seed])
+        return packages
+
+    def metapackage_name(seed, seed_text):
+        if config.has_option(dist, "metapackage_map/%s" % seed):
+            return config.get(dist, "metapackage_map/%s" % seed)
+        else:
+            task_meta_re = re.compile('^Task-Metapackage:\s*(.*)', re.I)
+            for line in seed_text:
+                task_meta_match = task_meta_re.match(line)
+                if task_meta_match is not None:
+                    return task_meta_match.group(1)
+            return "%s-%s" % (metapackage, seed)
+
+    debootstrap_version_file = 'debootstrap-version'
+
+    def get_debootstrap_version():
+        version_cmd = subprocess.Popen(
+            ['dpkg-query', '-W', '--showformat', '${Version}', 'debootstrap'],
+            stdout=subprocess.PIPE)
+        version, _ = version_cmd.communicate()
+        if not version:
+            error_exit('debootstrap does not appear to be installed')
+
+        return version
+
+    def debootstrap_packages(arch):
+        env = dict(os.environ)
+        if 'PATH' in env:
+            env['PATH'] = '/usr/sbin:/sbin:%s' % env['PATH']
+        else:
+            env['PATH'] = '/usr/sbin:/sbin:/usr/bin:/bin'
+        debootstrap = subprocess.Popen(
+            ['debootstrap', '--arch', arch,
+             '--components', ','.join(components),
+             '--print-debs', dist, 'debootstrap-dir', archive_base[arch][0]],
+            stdout=subprocess.PIPE, env=env, stderr=subprocess.PIPE)
+        (debootstrap_stdout, debootstrap_stderr) = debootstrap.communicate()
+        if debootstrap.returncode != 0:
+            error_exit('Unable to retrieve package list from debootstrap; stdout: %s\nstderr: %s' % (debootstrap_stdout, debootstrap_stderr))
+
+        packages = filter(None, debootstrap_stdout.split())
+        # sometimes debootstrap gives empty packages / multiple separators
+        packages.sort()
+
+        return packages
+
+    def check_debootstrap_version():
+        if os.path.exists(debootstrap_version_file):
+            with open(debootstrap_version_file) as debootstrap:
+                old_debootstrap_version = debootstrap.read().strip()
+            debootstrap_version = get_debootstrap_version()
+            failed = subprocess.call(
+                ['dpkg', '--compare-versions',
+                 debootstrap_version, 'ge', old_debootstrap_version])
+            if failed:
+                error_exit('Installed debootstrap is older than in the previous version! (%s < %s)' % (
+                    debootstrap_version,
+                    old_debootstrap_version
+                    ))
+
+    def update_debootstrap_version():
+        with open(debootstrap_version_file, 'w') as debootstrap:
+            debootstrap.write(get_debootstrap_version() + '\n')
+
+    def format_changes(items):
+        by_arch = {}
+        for (pkg, arch) in items:
+            by_arch.setdefault(pkg, [])
+            by_arch[pkg].append(arch)
+        all_pkgs = by_arch.keys()
+        all_pkgs.sort()
+        chunks = []
+        for pkg in all_pkgs:
+            arches = by_arch[pkg]
+            if set(architectures) - set(arches):
+                # only some architectures
+                arches.sort()
+                chunks.append('%s [%s]' % (pkg, ' '.join(arches)))
+            else:
+                # all architectures
+                chunks.append(pkg)
+        return ', '.join(chunks)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('%(levelname)s%(message)s'))
+    logger.addHandler(handler)
+    pretty_logging()
+
+    check_debootstrap_version()
+
+    additions = {}
+    removals = {}
+    moves = {}
+    metapackage_map = {}
+    for architecture in architectures:
+        print "[%s] Downloading available package lists..." % architecture
+        germinator = Germinator(architecture)
+        archive = germinate.archive.TagFile(
+            [dist], components, architecture,
+            archive_base[architecture], source_mirrors=archive_base_default,
+            cleanup=True)
+        germinator.parseArchive(archive)
+        debootstrap_base = set(debootstrap_packages(architecture))
+
+        print "[%s] Loading seed lists..." % architecture
+        try:
+            structure = SeedStructure(seed_dist, seed_base, options.bzr)
+            germinator.plantSeeds(structure, seeds=seeds)
+        except SeedError:
+            sys.exit(1)
+
+        print ("[%s] Merging seeds with available package lists..." %
+               architecture)
+        for seed_name in output_seeds:
+            meta_name = metapackage_name(seed_name, structure.texts[seed_name])
+            metapackage_map[seed_name] = meta_name
+
+            output_filename = os.path.join(
+                options.outdir, '%s-%s' % (seed_name, architecture))
+            old_list = None
+            if os.path.exists(output_filename):
+                with open(output_filename) as output:
+                    old_list = set(map(str.strip, output.readlines()))
+                os.rename(output_filename, output_filename + '.old')
+
+            # work on the depends
+            new_list = []
+            for package in seed_packages(germinator.seed, seed_name,
+                                         structure.texts[seed_name]):
+                if package == meta_name:
+                    print "%s/%s: Skipping package %s (metapackage)" % (seed_name,architecture,package)
+                elif seed_name == 'minimal' and package not in debootstrap_base:
+                    print "%s/%s: Skipping package %s (package not in debootstrap)" % (seed_name,architecture,package)
+                elif germinator.packages[package]["Essential"]:
+                    print "%s/%s: Skipping package %s (essential)" % (seed_name,architecture,package)
+                else:
+                    new_list.append(package)
+
+            new_list.sort()
+            with open(output_filename, 'w') as output:
+                for package in new_list:
+                    output.write(package)
+                    output.write('\n')
+
+            # work on the recommends
+            old_recommends_list = None
+            new_recommends_list = []
+            for package in seed_packages(germinator.seedrecommends, seed_name,
+                                         structure.texts[seed_name]):
+                if package == meta_name:
+                    print "%s/%s: Skipping package %s (metapackage)" % (seed_name,architecture,package)
+                    continue
+                if seed_name == 'minimal' and package not in debootstrap_base:
+                    print "%s/%s: Skipping package %s (package not in debootstrap)" % (seed_name,architecture,package)
+                else:
+                    new_recommends_list.append(package)
+
+            new_recommends_list.sort()
+            seed_name_recommends = '%s-recommends' % seed_name
+            output_recommends_filename = os.path.join(
+                options.outdir, '%s-%s' % (seed_name_recommends, architecture))
+            if os.path.exists(output_recommends_filename):
+                with open(output_recommends_filename) as output:
+                    old_recommends_list = set(map(str.strip, output.readlines()))
+                os.rename(output_recommends_filename, output_recommends_filename + '.old')
+
+            with open(output_recommends_filename, 'w') as output:
+                for package in new_recommends_list:
+                    output.write(package)
+                    output.write('\n')
+
+
+            # Calculate deltas
+            merged = {}
+            recommends_merged = {}
+            if old_list is not None:
+                for package in new_list:
+                    merged.setdefault(package, 0)
+                    merged[package] += 1
+                for package in old_list:
+                    merged.setdefault(package, 0)
+                    merged[package] -= 1
+            if old_recommends_list is not None:
+                for package in new_recommends_list:
+                    recommends_merged.setdefault(package, 0)
+                    recommends_merged[package] += 1
+                for package in old_recommends_list:
+                    recommends_merged.setdefault(package, 0)
+                    recommends_merged[package] -= 1
+
+            mergeditems = merged.items()
+            mergeditems.sort()
+            for package, value in mergeditems:
+                #print package, value
+                if value == 1:
+                    if recommends_merged.get(package, 0) == -1:
+                        moves.setdefault(package,[])
+                        moves[package].append([seed_name, architecture])
+                        recommends_merged[package] += 1
+                    else:
+                        additions.setdefault(package,[])
+                        additions[package].append([seed_name, architecture])
+                elif value == -1:
+                    if recommends_merged.get(package, 0) == 1:
+                        moves.setdefault(package,[])
+                        moves[package].append([seed_name_recommends,
+                                               architecture])
+                        recommends_merged[package] -= 1
+                    else:
+                        removals.setdefault(package,[])
+                        removals[package].append([seed_name, architecture])
+
+            mergedrecitems = recommends_merged.items()
+            mergedrecitems.sort()
+            for package, value in mergedrecitems:
+                #print package, value
+                if value == 1:
+                    additions.setdefault(package,[])
+                    additions[package].append([seed_name_recommends,
+                                               architecture])
+                elif value == -1:
+                    removals.setdefault(package,[])
+                    removals[package].append([seed_name_recommends,
+                                              architecture])
+
+    with open('metapackage-map', 'w') as metapackage_map_file:
+        for seed_name in output_seeds:
+            print >>metapackage_map_file, seed_name, metapackage_map[seed_name]
+
+    if not options.nodch and (additions or removals or moves):
+        dch_help = subprocess.Popen(['dch', '--help'], stdout=subprocess.PIPE)
+        try:
+            have_U = '-U' in dch_help.stdout.read()
+        finally:
+            dch_help.wait()
+        if have_U:
+            subprocess.check_call(['dch', '-iU', 'Refreshed dependencies'])
+        else:
+            subprocess.check_call(['dch', '-i', 'Refreshed dependencies'])
+        changes = []
+        addition_keys = additions.keys()
+        addition_keys.sort()
+        for package in addition_keys:
+            changes.append('Added %s to %s' %
+                           (package, format_changes(additions[package])))
+        removal_keys = removals.keys()
+        removal_keys.sort()
+        for package in removal_keys:
+            changes.append('Removed %s from %s' %
+                           (package, format_changes(removals[package])))
+        move_keys = moves.keys()
+        move_keys.sort()
+        for package in move_keys:
+            # TODO: We should really list where it moved from as well, but
+            # that gets wordy very quickly, and at the moment this is only
+            # implemented for depends->recommends or vice versa. In future,
+            # using this for moves between seeds might also be useful.
+            changes.append('Moved %s to %s' %
+                           (package, format_changes(moves[package])))
+        for change in changes:
+            print change
+            subprocess.check_call(['dch', '-a', change])
+        update_debootstrap_version()
+    else:
+        if not options.nodch:
+            print "No changes found"
+
+if __name__ == "__main__":
+    main()

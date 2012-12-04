@@ -93,11 +93,12 @@ if [ "$FULLARCH" = "armel+omap" ]; then
     v_opts="vram=12M omapfb.mode=dvi:1280x720MR-16@60"
     board_opts='mpurate=${mpurate}'
 elif [ "$FULLARCH" = "armel+omap4" ]; then
-    xloader_package="x-loader-omap4-panda"
-    path_to_xloader="usr/lib/x-loader/omap4430panda/MLO"
+    path_to_xloader="usr/lib/u-boot/omap4_panda/MLO"
 
     uboot_package="u-boot-linaro-omap4-panda"
     path_to_uboot="usr/lib/u-boot/omap4_panda/u-boot.bin"
+
+    xloader_package=$uboot_package
 
     board_opts="mem=456M@0x80000000 mem=512M@0xA0000000"
     v_opts="vram=32M"
@@ -190,11 +191,12 @@ HEADS=128
 # less than 72M as the first track is unused.
 # The root partition starts exactly at 72MB so at a 4MB boundary
 
+LEAD_IN="$(($SPT * 512))"
 BOOT_SIZE="$((72 * 1024 * 1024 - $SPT * 512))"
 BOOT_SIZE_SECTORS="$(($BOOT_SIZE / 512))"
 ROOT_START_SECTOR=$(($SPT + $BOOT_SIZE_SECTORS))
 IMAGE_SIZE="$(file_length "$EXT3")"
-IMG_SIZE_BLOCKS="$((($BOOT_SIZE + $IMAGE_SIZE + 512 - 1) / 512))"
+IMG_SIZE_BLOCKS="$((($LEAD_IN + $BOOT_SIZE + $IMAGE_SIZE + 512 - 1) / 512))"
 
 dd if=/dev/zero of="$IMAGE" bs=512 count=0 seek="$IMG_SIZE_BLOCKS" >/dev/null 2>&1
 

@@ -35,11 +35,8 @@ while (defined($_ = <LIST>)) {
         $source=$security if $file=~m:updates/:;
 
 	# If arch=all and filename points to binary-all then create
-	# a symbolic link in binary-$ARCH or if arch=all and filename is a
-	# symbolic link we suppose that the link points to
-	# .../binary-all/...  and we reproduce a similar setup on the CD
-	if ($arch eq "all" and (-l "$source/$file" or 
-	    			$file =~ m#/binary-all/#)) {
+	# a symbolic link in binary-$ARCH
+	if ($arch eq "all" and $file =~ m#/binary-all/#) {
 	    $file =~ s#/binary-all/#/binary-$ENV{'ARCH'}/#g;
 	    
 	    # Check that the directory where the link will be created does

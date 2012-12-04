@@ -1,0 +1,48 @@
+#! /usr/bin/python
+
+# Copyright (C) 2012 Canonical Ltd.
+# Author: Colin Watson <cjwatson@ubuntu.com>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 3 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Verify release files against CloudFront."""
+
+from optparse import OptionParser
+import os
+import socket
+import sys
+
+sys.path.insert(0, os.path.join(sys.path[0], os.pardir, "lib"))
+from cdimage.config import config
+from cdimage.cloudfront import verify_cloudfront
+
+
+def main():
+    parser = OptionParser("%prog URL-ROOT FILE [...]")
+    options, args = parser.parse_args()
+    if len(args) < 1:
+        parser.error("need URL root")
+    elif len(args) < 2:
+        parser.error("need at least one local file name")
+
+    if socket.getfqdn().endswith(".canonical.com"):
+        os.environ["http_proxy"] = "http://squid.internal:3128/"
+
+    if verify_cloudfront(config, args[0], args[1:]):
+        return 0
+    else:
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

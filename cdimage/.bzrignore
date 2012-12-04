@@ -1,0 +1,17 @@
+./MirrorMetalink
+./backups
+./britney
+./bzr
+./debian-cd
+./ftp*
+./germinate
+./local
+./log
+./production
+./scratch
+./secret
+./www
+etc/.lock*
+etc/.next-build-suffix*
+etc/.sem-build-image-set
+etc/task-mail

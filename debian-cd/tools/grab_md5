@@ -42,7 +42,7 @@ case $ARCH in
                                     DIR = ""
                             }' | sort | uniq >> $OUT
         ;;
-    alpha|amd64|arm|armel|hppa|i386|ia64|lpia|m68k|mips|mipsel|powerpc|s390|sparc)
+    alpha|amd64|arm|armel|armhf|hppa|i386|ia64|lpia|m68k|mips|mipsel|powerpc|s390|sparc)
         FILES=`find -L $MIRROR/dists/$SUITE/ -name Packages -o -name Packages.gz | grep binary-$ARCH`
         echo -e "Using MD5 sums from Packages files:\n$FILES"
         zcat -f $FILES | awk -v MIRROR=$MIRROR '

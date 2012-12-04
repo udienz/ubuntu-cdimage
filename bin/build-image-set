@@ -45,11 +45,11 @@ cleanup () {
 
 trap cleanup EXIT HUP INT QUIT TERM
 
-if ! lockfile -l 7200 -r 0 "$CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE"; then
+if ! lockfile -l 7200 -r 0 "$CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$DIST-$IMAGE_TYPE"; then
 	echo "Another image set is already building!" >&2
 	exit 1
 fi
-push_cleanup "rm -f $CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$IMAGE_TYPE"
+push_cleanup "rm -f $CDIMAGE_ROOT/etc/.lock-build-image-set-$PROJECT-$DIST-$IMAGE_TYPE"
 
 SEM="$CDIMAGE_ROOT/etc/.sem-build-image-set"
 # Set up a counting semaphore for parallel builds.
@@ -77,7 +77,12 @@ case $PROJECT in
 			export CDIMAGE_UNSUPPORTED=1
 		fi
 		;;
-	kubuntu-kde4|kubuntu-netbook|kubuntu-mobile)
+	kubuntu)
+		if dist_ge quantal; then
+			export CDIMAGE_UNSUPPORTED=1
+		fi
+		;;
+	kubuntu-active)
 		export CDIMAGE_UNSUPPORTED=1
 		;;
 	ubuntustudio)
@@ -119,40 +124,7 @@ if [ -z "$CDIMAGE_NOSYNC" ]; then
 			exit 1
 		fi
 		push_cleanup "rm -f $SYNC_LOCK"
-		#debmirrorsync main
-		#rsync $HOME/public_html/ubuntu/dists/$DIST/main/installer-$ARCHES/ $CDIMAGE_ROOT/ftp/dists/$DIST/main/installer-$ARCHES/ -avh
-		ARCHES_COLONS="$(echo "$CPUARCHES" | tr ' ' ':')"
-		if [ "$CDIMAGE_UNSUPPORTED" ]; then
-			#debmirrorsync universe
-			for component in main restricted; do
-				for distdir in "$CDIMAGE_ROOT/ftp/dists"/*; do
-					[ -d "$distdir" ] || continue
-					newdistdir="$(echo "$distdir" | sed 's/ftp/ftp-universe/')"
-					if [ -d "$distdir/$component" ] && [ -d "$newdistdir" ]; then
-						ln -nsf "$distdir/$component" "$newdistdir/$component"
-					fi
-				done
-				if [ -d "$CDIMAGE_ROOT/ftp/pool/$component" ] && [ -d "$CDIMAGE_ROOT/ftp-universe/pool" ]; then
-					ln -nsf "$CDIMAGE_ROOT/ftp/pool/$component" "$CDIMAGE_ROOT/ftp-universe/pool/$component"
-				fi
-			done
-		else
-			case :$ARCHES_COLONS: in
-				*:armel:*|*:hppa:*|*:ia64:*|*:lpia:*)
-					ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.ports" anonftpsync
-					;;
-				*:powerpc:*)
-					if dist_ge gutsy; then
-						ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.ports" anonftpsync
-					fi
-					;;
-				*:sparc:*)
-					if dist_ge hardy; then
-						ANONFTPSYNC_CONF="$CDIMAGE_ROOT/etc/anonftpsync.ports" anonftpsync
-					fi
-					;;
-			esac
-		fi
+		anonftpsync
 		pop_cleanup
 	else
 		echo "===== Parallel build; waiting for $CAPPROJECT mirror to sync ====="
@@ -228,8 +200,8 @@ cd "$CDIMAGE_ROOT/debian-cd"
 ./build_all.sh || true
 
 # Kludge to work around permission-handling problems elsewhere.
-find "$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE" -type d -print0 | xargs -0r chmod g+s 2>/dev/null || true
-chmod -R g+rwX "$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE" 2>/dev/null || true
+find "$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE" -type d -print0 | xargs -0r chmod g+s 2>/dev/null || true
+chmod -R g+rwX "$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE" 2>/dev/null || true
 
 # temporarily turned off for live builds
 if [ "$CDIMAGE_INSTALL_BASE" ]; then
@@ -249,7 +221,7 @@ if [ -z "$DEBUG" ] && [ -z "$CDIMAGE_NOPUBLISH" ]; then
 
 	echo "===== Triggering mirrors ====="
 	date
-	sync-mirrors
+	#sync-mirrors
 fi
 
 echo "===== Finished ====="

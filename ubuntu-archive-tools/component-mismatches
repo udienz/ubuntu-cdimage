@@ -1,0 +1,593 @@
+#!/usr/bin/env python
+
+# Sync a suite with a Seed list.
+# Copyright (C) 2004, 2005, 2009, 2010, 2011, 2012  Canonical Ltd.
+# Author: James Troup <james.troup@canonical.com>
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+# XXX - add indication if all of the binaries of a source packages are
+#       listed for promotion at once
+#       i.e. to allow 'change-override -S' usage
+
+from __future__ import print_function
+
+import atexit
+from collections import defaultdict
+import copy
+import gzip
+from optparse import OptionParser
+import os
+import shutil
+import sys
+import tempfile
+import time
+
+import apt_pkg
+from launchpadlib.launchpad import Launchpad
+
+
+tempdir = None
+
+archive_source = {}
+archive_binary = {}
+
+current_source = {}
+current_binary = {}
+
+germinate_source = {}
+germinate_binary = {}
+
+seed_source = defaultdict(set)
+seed_binary = defaultdict(set)
+
+
+def ensure_tempdir():
+    global tempdir
+    if not tempdir:
+        tempdir = tempfile.mkdtemp(prefix='component-mismatches')
+        atexit.register(shutil.rmtree, tempdir)
+
+
+def decompress_open(tagfile):
+    ensure_tempdir()
+    decompressed = tempfile.mktemp(dir=tempdir)
+    fin = gzip.GzipFile(filename=tagfile)
+    with open(decompressed, 'wb') as fout:
+        fout.write(fin.read())
+    return open(decompressed, 'r')
+
+
+def read_current_source(options):
+    for component in options.all_components:
+        sources_path = "%s/dists/%s/%s/source/Sources.gz" % (
+            options.archive_dir, options.suite, component)
+        for section in apt_pkg.TagFile(decompress_open(sources_path)):
+            if 'Package' in section and 'Version' in section:
+                (pkg, version) = (section['Package'], section['Version'])
+                if pkg not in archive_source:
+                    archive_source[pkg] = (version, component)
+                else:
+                    if apt_pkg.VersionCompare(
+                        archive_source[pkg][0], version) < 0:
+                        archive_source[pkg] = (
+                            version, component.split("/")[0])
+
+    for pkg, (version, component) in archive_source.items():
+        if component in options.components:
+            current_source[pkg] = (version, component)
+
+
+def read_current_binary(options):
+    components_with_di = []
+    for component in options.all_components:
+        components_with_di.append(component)
+        components_with_di.append('%s/debian-installer' % component)
+    for component in components_with_di:
+        for arch in ["i386", "amd64", "powerpc", "armhf"]:
+            binaries_path = "%s/dists/%s/%s/binary-%s/Packages.gz" % (
+                options.archive_dir, options.suite, component, arch)
+            for section in apt_pkg.TagFile(decompress_open(binaries_path)):
+                if 'Package' in section and 'Version' in section:
+                    (pkg, version) = (section['Package'], section['Version'])
+                    if 'source' in section:
+                        src = section['Source']
+                    else:
+                        src = section['Package']
+                    if pkg not in archive_binary:
+                        archive_binary[pkg] = (
+                            version, component.split("/")[0], src)
+                    else:
+                        if apt_pkg.VersionCompare(
+                            archive_binary[pkg][0], version) < 0:
+                            archive_binary[pkg] = (version, component, src)
+
+    for pkg, (version, component, src) in archive_binary.items():
+        if component in options.components:
+            current_binary[pkg] = (version, component, src)
+
+
+def read_germinate(options):
+    local_germinate = os.path.expanduser('~/mirror/ubuntu-germinate/')
+
+    for flavour in reversed(options.flavours.split(",")):
+        # List of seeds
+        seeds = ["all"]
+        try:
+            with open("%s/structure_%s_%s_i386" %
+                      (local_germinate, flavour, options.suite)) as structure:
+                for line in structure:
+                    if not line or line.startswith('#') or ':' not in line:
+                        continue
+                    seeds.append(line.split(':')[0])
+        except IOError:
+            continue
+        # ideally supported+build-depends too, but Launchpad's
+        # cron.germinate doesn't save this
+
+        for arch in ["i386", "amd64", "powerpc", "armhf"]:
+            for seed in seeds:
+                filename = "%s/%s_%s_%s_%s" \
+                           % (local_germinate, seed, flavour,
+                              options.suite, arch)
+                with open(filename) as f:
+                    for line in f:
+                        # Skip header and footer
+                        if (line[0] == "-" or line.startswith("Package") or
+                            line[0] == " "):
+                            continue
+                        # Skip empty lines
+                        line = line.strip()
+                        if not line:
+                            continue
+                        pkg, source, why = [word.strip()
+                                            for word in line.split('|')][:3]
+                        if seed == "all":
+                            germinate_binary[pkg] = (
+                                source, why, flavour, arch)
+                            germinate_source[source] = (flavour, arch)
+                        else:
+                            seed_binary[seed].add(pkg)
+                            seed_source[seed].add(source)
+
+
+def is_included_binary(options, pkg):
+    if options.include:
+        for seed in options.include.split(","):
+            if seed in seed_binary and pkg in seed_binary[seed]:
+                return True
+        return False
+    return True
+
+
+def is_excluded_binary(options, pkg):
+    if options.exclude:
+        seeds = set(seed_binary) - set(options.exclude.split(","))
+        for seed in seeds:
+            if seed in seed_binary and pkg in seed_binary[seed]:
+                return False
+        for seed in options.exclude.split(","):
+            if seed in seed_binary and pkg in seed_binary[seed]:
+                return True
+    return False
+
+
+def is_included_source(options, pkg):
+    if options.include:
+        for seed in options.include.split(","):
+            if seed in seed_source and pkg in seed_source[seed]:
+                return True
+        return False
+    return True
+
+
+def is_excluded_source(options, pkg):
+    if options.exclude:
+        seeds = set(seed_source) - set(options.exclude.split(","))
+        for seed in seeds:
+            if seed in seed_source and pkg in seed_source[seed]:
+                return False
+        for seed in options.exclude.split(","):
+            if seed in seed_source and pkg in seed_source[seed]:
+                return True
+    return False
+
+
+def get_source(binary):
+    return current_binary[binary][2]
+
+
+def do_reverse(source, binaries, why_d):
+    output = ""
+    depend = {}
+    recommend = {}
+    build_depend = {}
+    for binary in binaries:
+        why = why_d[source][binary]
+        if why.find("Build-Depend") != -1:
+            why = why.replace("(Build-Depend)", "").strip()
+            build_depend[why] = ""
+        elif why.find("Recommends") != -1:
+            why = why.replace("(Recommends)", "").strip()
+            recommend[why] = ""
+        else:
+            depend[why] = ""
+
+    def do_category(map, category):
+        keys = []
+        for k in map:
+            if k in current_binary:
+                keys.append('%s (%s)' % (k, current_binary[k][1].upper()))
+            elif k in current_source:
+                keys.append('%s (%s)' % (k, current_source[k][1].upper()))
+            else:
+                keys.append(k)
+        keys.sort()
+        if keys:
+            return "   [Reverse-%s: %s]\n" % (category, ", ".join(keys))
+        else:
+            return ""
+
+    output += do_category(depend, 'Depends')
+    output += do_category(recommend, 'Recommends')
+    output += do_category(build_depend, 'Build-Depends')
+    output += "\n"
+
+    return output
+
+
+def do_dot(why, fd, mir_bugs):
+    # write dot graph for given why dictionary
+
+    written_nodes = set()
+
+    fd.write(
+        'digraph "component-mismatches: movements to main/restricted" {\n')
+    for s, binwhy in why.iteritems():
+        for binary, why in binwhy.iteritems():
+            # ignore binaries from this source, and "rescued"
+            if why in binwhy or why.startswith('Rescued'):
+                continue
+
+            if "(Recommends)" in why:
+                relation = " R "
+                color = "gray"
+                why = why.replace(" (Recommends)", "")
+            elif "Build-Depend" in why:
+                relation = " B"
+                color = "blue"
+                why = why.replace(" (Build-Depend)", "")
+            else:
+                relation = ""
+                color = "black"
+
+            try:
+                why = get_source(why)
+            except KeyError:
+                # happens for sources which are in universe, or seeds
+                try:
+                    why = germinate_binary[why][0]
+                except:
+                    pass
+
+            # helper function to write a node
+            def write_node(name):
+                node_name = name.translate(None, ' -().')
+
+                # ensure to only write it once
+                if node_name in written_nodes:
+                    return node_name
+                written_nodes.add(node_name)
+
+                fd.write('  %s [label="%s" style="filled"' % (node_name, name))
+
+                mirs = mir_bugs.get(name, [])
+                approved_mirs = [
+                    id for id, status, title in mirs
+                    if status in ('Fix Committed', 'Fix Released')]
+
+                url = None
+                if name.endswith(' seed'):
+                    fc = "green"
+                elif name in current_source:
+                    fc = "lightgreen"
+                elif approved_mirs:
+                    fc = "yellow"
+                    url = "https://launchpad.net/bugs/%i" % approved_mirs[0]
+                elif mirs:
+                    if mirs[0][1] == 'Incomplete':
+                        fc = "darkkhaki"
+                    else:
+                        fc = "darksalmon"
+                    url = "https://launchpad.net/bugs/%i" % mirs[0][0]
+                else:
+                    fc = "white"
+                    url = ("https://launchpad.net/ubuntu/+source/%s/+filebug?"
+                           "field.title=[MIR]%%20%s" % (name, name))
+
+                fd.write(' fillcolor="%s"' % fc)
+                if url:
+                    fd.write(' URL="%s"' % url)
+                fd.write("]\n")
+                return node_name
+
+            s_node = write_node(s)
+            why_node = write_node(why)
+
+            # generate relation
+            fd.write('  %s -> %s [label="%s" color="%s" fontcolor="%s"]\n' %
+                    (why_node, s_node, relation, color, color))
+
+    # add legend
+    fd.write("""
+ {
+    rank="source"
+    NodeLegend[shape=none, margin=0, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+      <tr><td>Nodes</td></tr>
+      <tr><td bgcolor="green">seed</td></tr>
+      <tr><td bgcolor="lightgreen">in main/restricted </td></tr>
+      <tr><td bgcolor="yellow">approved MIR (clickable)</td></tr>
+      <tr><td bgcolor="darksalmon">unapproved MIR (clickable)</td></tr>
+      <tr><td bgcolor="darkkhaki">Incomplete/stub MIR (clickable)</td></tr>
+      <tr><td bgcolor="white">No MIR (click to file one)</td></tr>
+    </table>
+   >];
+
+    EdgeLegend[shape=none, margin=0, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+      <tr><td>Edges</td></tr>
+      <tr><td>Depends:</td></tr>
+      <tr><td><font color="gray">Recommends:</font></td></tr>
+      <tr><td><font color="blue">Build-Depends: </font></td></tr>
+    </table>
+   >];
+  }
+}
+""")
+
+
+def filter_source(component, sources):
+    return [s for s in sources if archive_source[s][1] == component]
+
+
+def filter_binary(component, binaries):
+    return [b for b in binaries if archive_binary[b][1] == component]
+
+
+def print_section(header, body):
+    if body:
+        print(" %s" % header)
+        print(" %s" % ("-" * len(header)))
+        print()
+        print(body.rstrip())
+        print()
+        print("=" * 70)
+        print()
+
+
+def do_output(options,
+              orig_source_add, orig_source_remove, binary_add, binary_remove,
+              mir_bugs):
+    # Additions
+
+    binary_only = defaultdict(dict)
+    both = defaultdict(dict)
+
+    source_add = copy.copy(orig_source_add)
+    source_remove = copy.copy(orig_source_remove)
+
+    for pkg in binary_add:
+        (source, why, flavour, arch) = binary_add[pkg]
+        if source not in orig_source_add:
+            binary_only[source][pkg] = why
+        else:
+            both[source][pkg] = why
+            if source in source_add:
+                source_add.remove(source)
+
+    for component in options.components:
+        if component == "main":
+            counterpart = "universe"
+        elif component == "restricted":
+            counterpart = "multiverse"
+        else:
+            continue
+
+        output = ""
+        for source in filter_source(counterpart, sorted(both)):
+            binaries = sorted(both[source])
+            output += " o %s: %s\n" % (source, " ".join(binaries))
+
+            for (id, status, title) in mir_bugs.get(source, []):
+                if title.startswith('[MIR]'):
+                    # no need to repeat the standard title
+                    output += '   MIR: #%i (%s)\n' % (id, status)
+                else:
+                    output += '   MIR: #%i (%s) %s\n' % (id, status, title)
+
+            output += do_reverse(source, binaries, both)
+
+        print_section("Source and binary movements to %s" % component, output)
+
+        output = ""
+        for source in sorted(binary_only):
+            binaries = filter_binary(counterpart, sorted(binary_only[source]))
+
+            if binaries:
+                what = " o %s" % (" ".join(binaries))
+                indent_right = 78 - len(what) - len(source) - 2
+                output += "%s%s{%s}\n" % (what, " " * indent_right, source)
+
+                output += do_reverse(source, binaries, binary_only)
+
+        print_section("Binary only movements to %s" % component, output)
+
+        output = ""
+        for source in filter_source(counterpart, sorted(source_add)):
+            output += " o %s\n" % (source)
+
+        print_section("Source only movements to %s" % component, output)
+
+    if options.dot:
+        with open(options.dot, 'w') as f:
+            do_dot(both, f, mir_bugs)
+
+    # Removals
+
+    binary_only = defaultdict(dict)
+    both = defaultdict(dict)
+    for pkg in binary_remove:
+        source = get_source(pkg)
+        if source not in orig_source_remove:
+            binary_only[source][pkg] = ""
+        else:
+            both[source][pkg] = ""
+            if source in source_remove:
+                source_remove.remove(source)
+
+    for component in options.components:
+        if component == "main":
+            counterpart = "universe"
+        elif component == "restricted":
+            counterpart = "multiverse"
+        else:
+            continue
+
+        output = ""
+        for source in filter_source(component, sorted(both)):
+            binaries = sorted(both[source])
+            output += " o %s: %s\n" % (source, " ".join(binaries))
+
+        print_section(
+            "Source and binary movements to %s" % counterpart, output)
+
+        output = ""
+        for source in sorted(binary_only):
+            binaries = filter_binary(component, sorted(binary_only[source]))
+
+            if binaries:
+                what = " o %s" % (" ".join(binaries))
+                indent_right = 78 - len(what) - len(source) - 2
+                output += "%s%s{%s}\n" % (what, " " * indent_right, source)
+
+        print_section("Binary only movements to %s" % counterpart, output)
+
+        output = ""
+        for source in filter_source(component, sorted(source_remove)):
+            output += " o %s\n" % (source)
+
+        print_section("Source only movements to %s" % counterpart, output)
+
+
+def do_source_diff(options):
+    removed = []
+    added = []
+    for pkg in current_source:
+        if pkg not in germinate_source:
+            removed.append(pkg)
+    for pkg in germinate_source:
+        if (pkg not in current_source and
+            is_included_source(options, pkg) and
+            not is_excluded_source(options, pkg)):
+            added.append(pkg)
+    removed.sort()
+    added.sort()
+    return (added, removed)
+
+
+def do_binary_diff(options):
+    removed = []
+    added = {}
+    for pkg in current_binary:
+        if pkg not in germinate_binary:
+            removed.append(pkg)
+    for pkg in germinate_binary:
+        if (pkg not in current_binary and
+            is_included_binary(options, pkg) and
+            not is_excluded_binary(options, pkg)):
+            added[pkg] = germinate_binary[pkg]
+    removed.sort()
+    return (added, removed)
+
+
+def get_mir_bugs(options, sources):
+    '''Return MIR bug information for a set of source packages.
+
+    Return a map source -> [(id, status, title), ...]
+    '''
+    result = defaultdict(list)
+    mir_team = options.launchpad.people['ubuntu-mir']
+    for source in sources:
+        tasks = options.distro.getSourcePackage(name=source).searchTasks(
+            bug_subscriber=mir_team)
+        for task in tasks:
+            result[source].append((task.bug.id, task.status, task.bug.title))
+
+    return result
+
+
+def main():
+    apt_pkg.init()
+
+    parser = OptionParser(description='Sync a suite with a Seed list.')
+    parser.add_option(
+        "-l", "--launchpad", dest="launchpad_instance", default="production")
+    parser.add_option('-o', '--output-file', help='output to this file')
+    parser.add_option('-s', '--suite', help='check this suite')
+    parser.add_option('-f', '--flavours', default='ubuntu',
+                      help='check these flavours (comma-separated)')
+    parser.add_option('-i', '--include', help='include these seeds')
+    parser.add_option('-e', '--exclude', help='exclude these seeds')
+    parser.add_option('-d', '--dot',
+                      help='generate main promotion graph suitable for dot')
+    options, args = parser.parse_args()
+
+    options.launchpad = Launchpad.login_anonymously(
+        'component-mismatches', options.launchpad_instance)
+    options.distro = options.launchpad.distributions['ubuntu']
+
+    options.archive_dir = os.path.expanduser('~/mirror/ubuntu/')
+
+    options.component = "main,restricted"
+    options.components = options.component.split(',')
+    options.all_components = ["main", "restricted", "universe", "multiverse"]
+
+    if options.suite is None:
+        options.suite = options.distro.current_series.name
+
+    if options.output_file is not None:
+        sys.stdout = open('%s.new' % options.output_file, 'w')
+
+    print('Generated: %s' % time.strftime('%a %b %e %H:%M:%S %Z %Y'))
+    print()
+
+    read_germinate(options)
+    read_current_source(options)
+    read_current_binary(options)
+    source_add, source_remove = do_source_diff(options)
+    binary_add, binary_remove = do_binary_diff(options)
+    mir_bugs = get_mir_bugs(options, source_add)
+    do_output(
+        options, source_add, source_remove, binary_add, binary_remove,
+        mir_bugs)
+
+    if options.output_file is not None:
+        sys.stdout.close()
+        os.rename('%s.new' % options.output_file, options.output_file)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# Do post-image-building tasks for armel+omap, to make vfat images bootable;
+# this script encapsulates the VFAT image in a PC partition image, with
+# unpartitioned data holding boot data; this is very board specific and targets
+# the Marvell Dove reference boards (e.g. Y0/Y1) but might work on other Dove
+# boards
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+# $3 is the image file
+#
+# Copyright (c) 2009 Canonical
+# Authors: Oliver Grawert <ogra@canonical.com>
+#
+
+. "$BASEDIR/tools/boot/$DI_CODENAME/common.sh"
+
+set -e
+
+N="$1"
+CDDIR="$2"
+IMAGENAME="$3"
+
+log() {
+    echo "$*" >&2
+}
+
+die() {
+    log "$@"
+    exit 1
+}
+
+# Only disk 1* bootable
+if ([ "$N" != 1 ] && [ "$N" != 1_NONUS ]) || [ "$CDIMAGE_ADDON" ]; then
+    exit 0
+fi
+
+if [ "$IMAGE_FORMAT" == "iso" ]; then
+    exit 0
+fi
+
+cd "$CDDIR/.."
+
+if [ "$CDIMAGE_PREINSTALLED" != 1 ]; then
+    exit 0
+fi
+
+BOOTIMG_IN=$PREINSTALLEDIMAGES/$FULLARCH.bootimg-$SUBARCH
+BOOTIMG_OUT=$(echo $IMAGENAME|sed 's/.raw/.bootimg/')
+
+log "Moving .bootimg file to ${BOOTIMG_OUT}"
+mv "$BOOTIMG_IN" "$BOOTIMG_OUT"

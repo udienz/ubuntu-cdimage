@@ -62,8 +62,10 @@ DISK_IMAGES=""
 TAR_IMAGES="netboot/netboot.tar.gz"
 
 if [ "$CDIMAGE_DVD" = 1 ]; then
-    BOOT_IMAGES="$BOOT_IMAGES maverick-cdrom/initrd.gz maverick-cdrom/vmlinuz"
-    TAR_IMAGE="$TAR_IMAGES maverick-netboot/netboot.tar.gz"
+    for backport in $BACKPORT_KERNELS; do
+	BOOT_IMAGES="$BOOT_IMAGES $backport-cdrom/initrd.gz $backport-cdrom/vmlinuz"
+	TAR_IMAGES="$TAR_IMAGES $backport-netboot/netboot.tar.gz"
+    done
 fi
 
 # Download boot images
@@ -104,11 +106,13 @@ if [ "$NN" = "1" ]; then
     if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
 	cp -lf cdrom/vmlinuz $CDDIR/install/
 	cp -lf cdrom/initrd.gz $CDDIR/install/
-	if [ -d maverick-cdrom ]; then
-	    mkdir -p $CDDIR/install/maverick
-	    cp -lf maverick-cdrom/vmlinuz $CDDIR/install/maverick/
-	    cp -lr maverick-cdrom/initrd.gz $CDDIR/install/maverick/
-	fi
+	for backport in $BACKPORT_KERNELS; do
+	    if [ -d $backport-cdrom ]; then
+		mkdir -p $CDDIR/install/$backport
+		cp -lf $backport-cdrom/vmlinuz $CDDIR/install/$backport/
+		cp -lr $backport-cdrom/initrd.gz $CDDIR/install/$backport/
+	    fi
+	done
     fi
     if [ "$CDIMAGE_LIVE" = 1 ]; then
 	mv $CDDIR/casper/filesystem.kernel-generic $CDDIR/casper/vmlinuz
@@ -157,7 +161,9 @@ done
 
 if [ "$CDIMAGE_INSTALL" = 1 ]; then
 	for tar in $TAR_IMAGES; do
-		dir=$(dirname $tar | sed 's,^maverick-,maverick/,')
+		for backport in $BACKPORT_KERNELS; do
+			dir=$(dirname $tar | sed "s,^$backport-,$backport/,")
+		done
 		mkdir -p $CDDIR/install/$dir
 		tar -C $CDDIR/install/$dir -xzpf $tar
 	done
@@ -243,9 +249,11 @@ else
     DEFAULT_LABEL=install
 fi
 APPLIES_INSTALL=install
-if [ -d "$CDDIR/install/maverick" ]; then
-    APPLIES_INSTALL="$APPLIES_INSTALL install-maverick"
-fi
+for backport in $BACKPORT_KERNELS; do
+    if [ -d "$CDDIR/install/$backport" ]; then
+	APPLIES_INSTALL="$APPLIES_INSTALL install-$backport"
+    fi
+done
 cat > boot$N/isolinux/text.cfg <<EOF
 default $DEFAULT_LABEL
 EOF
@@ -326,28 +334,32 @@ label install
   append $KERNEL_PARAMS $DEFAULT_PRESEED initrd=/install/initrd.gz quiet --
 EOF
     fi
-    if [ -d "$CDDIR/install/maverick" ]; then
-	cat >> boot$N/isolinux/text.cfg <<EOF
-label install-maverick
-  menu label ^Install $HUMANPROJECT (2.6.35 kernel)
-  kernel /install/maverick/vmlinuz
-  append $KERNEL_PARAMS $DEFAULT_PRESEED initrd=/install/maverick/initrd.gz quiet --
+    for backport in $BACKPORT_KERNELS; do
+	if [ -d "$CDDIR/install/$backport" ]; then
+	    cat >> boot$N/isolinux/text.cfg <<EOF
+label install-$backport
+  menu label ^Install $HUMANPROJECT ($(backport_kernel_version "$backport") kernel)
+  kernel /install/$backport/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED initrd=/install/$backport/initrd.gz quiet --
 EOF
-    fi
+	fi
+    done
     cat >> boot$N/isolinux/adtext.cfg <<EOF
 label expert
   menu hide
   kernel /install/vmlinuz
   append $KERNEL_PARAMS $DEFAULT_PRESEED priority=low initrd=/install/initrd.gz --
 EOF
-    if [ -d "$CDDIR/install/maverick" ]; then
-	cat >> boot$N/isolinux/adtext.cfg <<EOF
-label expert-maverick
+    for backport in $BACKPORT_KERNELS; do
+	if [ -d "$CDDIR/install/$backport" ]; then
+	    cat >> boot$N/isolinux/adtext.cfg <<EOF
+label expert-$backport
   menu hide
-  kernel /install/maverick/vmlinuz
-  append $KERNEL_PARAMS $DEFAULT_PRESEED priority=low initrd=/install/maverick/initrd.gz --
+  kernel /install/$backport/vmlinuz
+  append $KERNEL_PARAMS $DEFAULT_PRESEED priority=low initrd=/install/$backport/initrd.gz --
 EOF
-    fi
+	fi
+    done
     if [ "$PROJECT" = edubuntu ]; then
 	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
 label workstation=Install a workstation
@@ -359,8 +371,15 @@ EOF
 	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
 label server=Install a server
 replace server=file=/cdrom/preseed/ubuntu-server.seed
-applies server=$APPLIES_INSTALL
+applies server=install
 EOF
+	for backport in $BACKPORT_KERNELS; do
+	    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label server-$backport=Install a server
+replace server-$backport=file=/cdrom/preseed/$backport-ubuntu-server.seed
+applies server-$backport=install-$backport
+EOF
+	done
     fi
 fi
 if [ "$PROJECT" != edubuntu ]; then
@@ -389,11 +408,21 @@ EOF
 	cat >> boot$N/isolinux/gfxboot.cfg <<EOF
 label minimal=Install a minimal system
 replace minimal=file=/cdrom/preseed/ubuntu-server-minimal.seed
-applies minimal=$APPLIES_INSTALL
+applies minimal=install
 label minimalvm=Install a minimal virtual machine
 replace minimalvm=file=/cdrom/preseed/ubuntu-server-minimalvm.seed
-applies minimalvm=$APPLIES_INSTALL
+applies minimalvm=install
 EOF
+	for backport in $BACKPORT_KERNELS; do
+	    cat >> boot$N/isolinux/gfxboot.cfg <<EOF
+label minimal-$backport=Install a minimal system
+replace minimal-$backport=file=/cdrom/preseed/$backport-ubuntu-server-minimal.seed
+applies minimal-$backport=install-$backport
+label minimalvm-$backport=Install a minimal virtual machine
+replace minimalvm-$backport=file=/cdrom/preseed/$backport-ubuntu-server-minimalvm.seed
+applies minimalvm-$backport=install-$backport
+EOF
+	done
 	# This really ought to be in gfxboot.cfg instead, but we want to
 	# make it particularly prominent.
 	cat >> boot$N/isolinux/text.cfg <<EOF
@@ -402,14 +431,16 @@ label cloud
   kernel /install/vmlinuz
   append $KERNEL_PARAMS file=/cdrom/preseed/cloud.seed initrd=/install/initrd.gz quiet --
 EOF
-	if [ -d "$CDDIR/install/maverick" ]; then
-	    cat >> boot$N/isolinux/text.cfg <<EOF
-label cloud-maverick
-  menu label Install Ubuntu ^Enterprise Cloud (2.6.35 kernel)
-  kernel /install/maverick/vmlinuz
-  append $KERNEL_PARAMS file=/cdrom/preseed/cloud.seed initrd=/install/maverick/initrd.gz quiet --
+	for backport in $BACKPORT_KERNELS; do
+	    if [ -d "$CDDIR/install/$backport" ]; then
+		cat >> boot$N/isolinux/text.cfg <<EOF
+label cloud-$backport
+  menu label Install Ubuntu ^Enterprise Cloud ($(backport_kernel_version "$backport") kernel)
+  kernel /install/$backport/vmlinuz
+  append $KERNEL_PARAMS file=/cdrom/preseed/$backport-cloud.seed initrd=/install/$backport/initrd.gz quiet --
 EOF
-	fi
+	    fi
+	done
     fi
 fi
 if [ "$CDIMAGE_INSTALL" = 1 ] && ([ "$PROJECT" = ubuntu ] || [ "$PROJECT" = xubuntu ] || [ "$PROJECT" = edubuntu ]); then
@@ -448,14 +479,16 @@ label rescue
   kernel /install/vmlinuz
   append $KERNEL_PARAMS rescue/enable=true initrd=/install/initrd.gz --
 EOF
-    if [ -d "$CDDIR/install/maverick" ]; then
-	cat >> boot$N/isolinux/adtext.cfg <<EOF
-label rescue-maverick
-  menu label ^Rescue a broken system (2.6.35 kernel)
-  kernel /install/maverick/vmlinuz
-  append $KERNEL_PARAMS rescue/enable=true initrd=/install/maverick/initrd.gz --
+    for backport in $BACKPORT_KERNELS; do
+	if [ -d "$CDDIR/install/$backport" ]; then
+	    cat >> boot$N/isolinux/adtext.cfg <<EOF
+label rescue-$backport
+  menu label ^Rescue a broken system ($(backport_kernel_version "$backport") kernel)
+  kernel /install/$backport/vmlinuz
+  append $KERNEL_PARAMS rescue/enable=true initrd=/install/$backport/initrd.gz --
 EOF
-    fi
+	fi
+    done
 fi
 cat >> boot$N/isolinux/text.cfg <<EOF
 label memtest

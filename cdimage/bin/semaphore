@@ -1,0 +1,60 @@
+#! /bin/sh
+set -e
+
+# Handle atomic counting semaphore files. This implements two operations,
+# namely test-increment (test non-zero, increment, return state of test) and
+# decrement-test (decrement, test non-zero, return state of test), which are
+# sufficient for use as a shared lock which only opens when all users have
+# unlocked. It is an error to call decrement-test on a semaphore that is
+# already zero.
+#
+# The semaphore state is returned on stdout to allow the exit status to be
+# used to report errors.
+
+if [ -z "$1" ] || [ -z "$2" ] || \
+   ([ "$1" != 'test-increment' ] && [ "$1" != 'decrement-test' ]); then
+	echo 'Usage: semaphore test-increment|decrement-test SEMAPHORE' >&2
+	exit 1
+fi
+
+MODE="$1"
+SEMAPHORE="$2"
+
+if ! lockfile -r 4 "$SEMAPHORE.lock"; then
+	echo "Cannot acquire lock on semaphore $SEMAPHORE!" >&2
+	exit 1
+fi
+trap "code=\$?; rm -f $SEMAPHORE.lock; exit \$code" EXIT HUP INT QUIT TERM
+
+if ! [ -e "$SEMAPHORE" ]; then
+	echo 0 > "$SEMAPHORE"
+fi
+
+add () {
+	CUR="$(cat "$SEMAPHORE")"
+	echo "$(($CUR + $1))" > "$SEMAPHORE"
+}
+
+case $MODE in
+	test-increment)
+		STATE="$(cat "$SEMAPHORE")"
+		add 1
+		echo "$STATE"
+		;;
+	decrement-test)
+		STATE="$(cat "$SEMAPHORE")"
+		if [ "$STATE" = 0 ]; then
+			rm -f "$SEMAPHORE"
+			echo "Attempted to decrement semaphore $SEMAPHORE when already zero!" >&2
+			exit 1
+		fi
+		add -1
+		STATE="$(cat "$SEMAPHORE")"
+		if [ "$STATE" = 0 ]; then
+			rm -f "$SEMAPHORE"
+		fi
+		echo "$STATE"
+		;;
+esac
+
+exit 0

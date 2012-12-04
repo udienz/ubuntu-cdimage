@@ -1,0 +1,202 @@
+#!/bin/bash
+#
+# Do post-image-building tasks for arm+mx5, to make vfat images bootable;
+# this script encapsulates the VFAT image in a PC partition image, with
+# unpartitioned data holding boot data; this is very board specific and targets
+# the iMX53 QuickStart boards
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+# $3 is the image file
+#
+# Copyright (c) 2009,2011 Canonical
+# Authors: Oliver Grawert <ogra@canonical.com>
+#          Loïc Minier <loic.minier@canonical.com>
+#          Jani Monoses <jani.monoses@canonical.com>
+#
+
+. "$BASEDIR/tools/boot/$DI_CODENAME/common.sh"
+
+# sfdisk is in /sbin
+PATH="$PATH:/sbin"
+
+set -e
+
+N="$1"
+CDDIR="$2"
+IMAGE="$3"
+
+log() {
+    echo "$*" >&2
+}
+
+die() {
+    log "$@"
+    exit 1
+}
+
+# Only disk 1* bootable
+if ([ "$N" != 1 ] && [ "$N" != 1_NONUS ]) || [ "$CDIMAGE_ADDON" ]; then
+    exit 0
+fi
+
+# We only want to do this for vfat images
+if [ "$IMAGE_FORMAT" == "iso" ]; then
+    exit 0
+fi
+
+cd "$CDDIR/.."
+
+# this script creates an image to write to a SD card with a PC partition table;
+
+file_length() {
+    stat -c %s "$1"
+}
+
+extract_file_from_package() {
+    package=$1
+    file_to_extract=$2
+    output_file_name=$3
+
+    export UNIVERSE=1
+
+    deb="$("$BASEDIR/tools/apt-selection" cache show "$package" | sed -n 's/^Filename: //p')"
+    if [ "$deb" = "" ]; then
+        log "Package $package not found!"
+        exit 1
+    fi
+
+    tmpdir=`mktemp -d`
+    ar p "$MIRROR/$deb" data.tar.gz | tar zxf - -C $tmpdir "./$file_to_extract"
+    mv $tmpdir/$file_to_extract ./$output_file_name
+    rm -rf $tmpdir
+}
+
+uboot_package="u-boot-linaro-mx53loco"
+path_to_uboot="usr/lib/u-boot/mx53loco/u-boot.imx"
+
+#for now enable serial console for all flavours
+board_opts="console=tty0 console=ttymxc0,115200n8"
+
+if [ "$PROJECT" = "ubuntu-headless" ] || [ "$PROJECT" = "ubuntu-server" ]; then
+    flavour_opts="debian-installer/framebuffer=false console=ttymxc0,115200n8"
+fi
+
+log "Extracting bootloader binary from a package"
+extract_file_from_package $uboot_package $path_to_uboot "u-boot.imx"
+
+uboot_kernel="uImage"
+uboot_initrd="uInitrd"
+uboot_kernel_addr="0x70000000"
+uboot_initrd_addr="0x72000000"
+uboot_script_text="$CDDIR/boot.txt"
+uboot_script_image="$CDDIR/boot.scr"
+
+# FIXME due to the fact that our kernel doesnt use the actual subarch name
+# we need to hardcode the flavour name here (find-live-filesystem has the
+# other half of this hack)
+FLAVOUR=linaro-lt-mx5
+
+if [ "$CDIMAGE_PREINSTALLED" = 1 ]; then
+    uboot_input_kernel="$PREINSTALLEDIMAGES/$FULLARCH.kernel-$FLAVOUR"
+    uboot_input_initrd="$PREINSTALLEDIMAGES/$FULLARCH.initrd-$FLAVOUR"
+    #uboot_extra_cmdline=" root=/dev/mmcblk0p3 quiet splash"
+    uboot_extra_cmdline=" root=/dev/mmcblk0p3"
+else
+    die "Only preinstalled images supported for the iMX53"
+fi
+
+EXT3=$IMAGE.rootfs
+MTOOLSRC=$IMAGE.mtoolsrc
+
+# Turn our kernel and initrd into a uImage and uInitrd
+log "Calling uboot-mkimage on kernel and initrd"
+
+rm -f $uboot_kernel $uboot_initrd
+mkimage -A arm -O linux -T kernel -C none -a 0x70008000 -e 0x70008000 -n "Ubuntu Kernel" -d "$uboot_input_kernel" "$uboot_kernel"
+mkimage -A arm -O linux -T ramdisk -C gzip -a 0x0 -e 0x0 -n "Ubuntu Initrd" -d "$uboot_input_initrd" "$uboot_initrd"
+
+
+# here we will need to create boot.scr and mcopy it too
+
+log "Generating boot.scr"
+cat >"$uboot_script_text" <<EOF
+    fatload mmc 0:2 $uboot_kernel_addr $uboot_kernel
+    fatload mmc 0:2 $uboot_initrd_addr $uboot_initrd
+    setenv bootargs $board_opts $DEFAULT_PRESEED $uboot_extra_cmdline $flavour_opts
+    bootm $uboot_kernel_addr $uboot_initrd_addr
+EOF
+
+mkimage -A arm -T script -C none -n "Ubuntu boot script" -d "$uboot_script_text" "$uboot_script_image"
+
+# Move the ext3 filesystem out of the way
+mv $IMAGE $EXT3
+
+# mtools sanity checks are getting in the way, so we need to turn its brain off
+cat > $MTOOLSRC <<EOF
+mtools_skip_check=1
+EOF
+
+export MTOOLSRC
+
+#define sectors per track and number of heads. These need to be in sync
+#with the partition table altering code in the jasper initramfs script.
+
+SPT=32
+HEADS=128
+
+# Partition layout:
+# - 4 MiB of non-filesystem area where the uboot binary resides.
+# - a 52 MiB VFAT partition holding the kernel and initrd which are read by u-boot
+# - the EXT3 formatted root partition
+
+LEAD_IN=512
+
+RESERVED_START_SECTOR=1
+RESERVED_SIZE=$((4 * 1024 * 1024 - 512))
+RESERVED_SIZE_SECTORS=$((RESERVED_SIZE / 512))
+
+BOOT_START_SECTOR=$(($RESERVED_START_SECTOR + $RESERVED_SIZE_SECTORS))
+BOOT_SIZE="$((52 * 1024 * 1024))"
+BOOT_SIZE_SECTORS="$(($BOOT_SIZE / 512))"
+
+ROOT_START_SECTOR=$(($BOOT_START_SECTOR + $BOOT_SIZE_SECTORS))
+IMAGE_SIZE="$(file_length "$EXT3")"
+IMG_SIZE_SECTORS="$((($LEAD_IN + $RESERVED_SIZE + $BOOT_SIZE + $IMAGE_SIZE + 512 - 1) / 512))"
+
+#Create zero-filled file of the required size
+
+dd if=/dev/zero of="$IMAGE" bs=512 count=0 seek="$IMG_SIZE_SECTORS"
+
+# The ROM loader expects the bootloader binary to be at address 0x400 on the media,
+# which corresponds to sector 2 for the default sector size of 512.
+
+dd if=u-boot.imx of="$IMAGE" conv=notrunc,fsync bs=512 seek=2
+
+TRG_SIZE="$(file_length "$IMAGE")"
+CYLINDERS="$((($TRG_SIZE/$HEADS/$SPT + 512 -1 )/512))"
+
+#Use sectors as unit, to better control placement of partitions
+{
+    echo 1,$RESERVED_SIZE_SECTORS,0xDA,-
+    echo $BOOT_START_SECTOR,$BOOT_SIZE_SECTORS,0x0C,-
+    echo $ROOT_START_SECTOR,,,-
+} | sfdisk -L -H $HEADS -S $SPT -C $CYLINDERS -uS --force $IMAGE
+
+VATSTART=$(parted $IMAGE unit B print|grep "^ 2"|awk '{print $2}')
+VATSIZE=$(LANG=C sfdisk -l ${IMAGE} 2>/dev/null|grep W95 |awk '{print $5}')
+
+mkdosfs -F 32 -C $IMAGE.vfat ${VATSIZE}
+mcopy -i $IMAGE.vfat $uboot_kernel ::uImage
+mcopy -i $IMAGE.vfat $uboot_initrd ::uInitrd
+mcopy -i $IMAGE.vfat $uboot_script_image ::boot.scr
+mcopy -i $IMAGE.vfat $uboot_script_text ::boot.txt
+
+# now put the whole vfat into the first partition
+dd conv=notrunc bs="${VATSTART%B}" if=$IMAGE.vfat of="$IMAGE" seek=1
+# put ext3 content into the second partition
+EXT3START=$(parted $IMAGE unit B print|grep "^ 3"|awk '{print $2}')
+dd conv=notrunc bs="${EXT3START%B}" if=$IMAGE.rootfs of="$IMAGE" seek=1
+
+# Cleanup
+rm -f "$IMAGE.rootfs" "$IMAGE.vfat" "$IMAGE.mtoolsrc" u-boot.imx uImage uInitrd

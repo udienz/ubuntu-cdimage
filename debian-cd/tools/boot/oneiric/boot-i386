@@ -98,6 +98,7 @@ if [ "$NN" = "1" ]; then
     cp -f $CDDIR/../syslinux/usr/lib/syslinux/isolinux.bin boot$N/isolinux/
     cp -f $CDDIR/../syslinux/usr/lib/syslinux/vesamenu.c32 boot$N/isolinux/
     cp -f $CDDIR/../syslinux/usr/lib/syslinux/gfxboot.c32 boot$N/isolinux/
+    cp -f $CDDIR/../syslinux/usr/lib/syslinux/chain.c32 boot$N/isolinux/
 
     GFXBOOT=
     if THEMEDEB="$($BASEDIR/tools/apt-selection cache show gfxboot-theme-ubuntu)"; then
@@ -417,9 +418,9 @@ EOF
 	# make it particularly prominent.
 	cat >> boot$N/isolinux/txt.cfg <<EOF
 label cloud
-  menu label Install Ubuntu ^Enterprise Cloud
+  menu label ^Enlist system with Ubuntu Orchestra Server
   kernel /install/vmlinuz
-  append $KERNEL_PARAMS file=/cdrom/preseed/cloud.seed vga=788 initrd=/install/initrd.gz quiet --
+  append $KERNEL_PARAMS modules=cobbler-enlist-udeb vga=788 initrd=/install/initrd.gz quiet --
 EOF
     fi
 fi

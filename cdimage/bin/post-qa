@@ -1,0 +1,120 @@
+#! /bin/sh
+set -e
+
+export CDIMAGE_ROOT="${CDIMAGE_ROOT:-/srv/cdimage.ubuntu.com}"
+. "$CDIMAGE_ROOT/etc/config"
+
+if [ -z "$1" ] || [ -z "$2" ]; then echo 'Usage: post-qa DATE PROJECT/IMAGE_TYPE/DIST-TYPE-ARCH [...]' >&2
+	exit 1
+fi
+
+POSTER="$CDIMAGE_ROOT/ubuntu-archive-tools/post-image-to-iso-tracker"
+
+DATE="$1"
+shift
+
+for image; do
+	imagebase="${image##*/}"
+	dist="${imagebase%-*-*}"
+	arch="${imagebase##*-}"
+
+	case $image in
+	    ubuntu/daily/*-alternate-*|ubuntu/*/daily/*-alternate-*)
+		product="Ubuntu Alternate $arch"
+		;;
+	    ubuntu/daily-live/*-desktop-*|ubuntu/*/daily-live/*-desktop-*)
+		product="Ubuntu Desktop $arch"
+		;;
+	    ubuntu/daily-preinstalled/*-preinstalled-desktop-*|ubuntu/*/daily-preinstalled/*-preinstalled-desktop-*)
+		product="Ubuntu Desktop Preinstalled $arch"
+		;;
+	    ubuntu/dvd/*-dvd-*|ubuntu/*/dvd/*-dvd-*)
+		product="Ubuntu DVD $arch"
+		;;
+	    ubuntu/wubi/*-wubi-*|ubuntu/*/wubi/*-wubi-*)
+		product="Ubuntu Wubi $arch"
+		;;
+	    kubuntu/daily/*-alternate-*|kubuntu/*/daily/*-alternate-*)
+		product="Kubuntu Alternate $arch"
+		;;
+	    kubuntu/daily-live/*-desktop-*|kubuntu/*/daily-live/*-desktop-*)
+		product="Kubuntu Desktop $arch"
+		;;
+	    kubuntu/daily-preinstalled/*-preinstalled-desktop-*|kubuntu/*/daily-preinstalled/*-preinstalled-desktop-*)
+		product="Kubuntu Desktop $arch"
+		;;
+	    kubuntu/dvd/*-dvd-*|kubuntu/*/dvd/*-dvd-*)
+		product="Kubuntu DVD $arch"
+		;;
+	    kubuntu-active/daily-live/*-desktop-*|kubuntu-active/*/daily-live/*-desktop-*)
+		product="Kubuntu Active $arch"
+		;;
+	    kubuntu-active/daily-preinstalled/*-preinstalled-mobile-*|kubuntu-active/*/daily-preinstalled/*-preinstalled-mobile-*)
+		product="Kubuntu Active $arch"
+		;;
+	    edubuntu/dvd/*-dvd-*|edubuntu/*/dvd/*-dvd-*)
+		product="Edubuntu DVD $arch"
+		;;
+	    xubuntu/daily/*-alternate-*|xubuntu/*/daily/*-alternate-*)
+		product="Xubuntu Alternate $arch"
+		;;
+	    xubuntu/daily-live/*-desktop-*|xubuntu/*/daily-live/*-desktop-*)
+		product="Xubuntu Desktop $arch"
+		;;
+	    ubuntu-server/daily/*-server-*|ubuntu-server/*/daily/*-server-*)
+		product="Ubuntu Server $arch"
+		;;
+	    ubuntu-server/daily-preinstalled/*-preinstalled-server-*|ubuntu-server/*/daily-preinstalled/*-preinstalled-server-*)
+		product="Ubuntu Server $arch"
+		;;
+	    ubuntustudio/daily/*-alternate-*|ubuntustudio/*/daily/*-alternate-*)
+		product="Ubuntu Studio Alternate $arch"
+		;;
+	    ubuntustudio/dvd/*-dvd-*|ubuntustudio/*/dvd/*-dvd-*)
+		product="Ubuntu Studio DVD $arch"
+		;;
+	    mythbuntu/daily-live/*-desktop-*|mythbuntu/*/daily-live/*-desktop-*)
+		product="Mythbuntu Desktop $arch"
+		;;
+	    lubuntu/daily/*-alternate-*|lubuntu/*/daily/*-alternate-*)
+		product="Lubuntu Alternate $arch"
+		;;
+	    lubuntu/daily-live/*-desktop-*|lubuntu/*/daily-live/*-desktop-*)
+		product="Lubuntu Desktop $arch"
+		;;
+	    lubuntu/daily-preinstalled/*-preinstalled-desktop-*|lubuntu/*/daily-preinstalled/*-preinstalled-desktop-*)
+		product="Lubuntu Desktop Preinstalled $arch"
+		;;
+	    ubuntu-core/daily/*-core-*|ubuntu-core/*/daily/*-core-*)
+		product="Ubuntu Core $arch"
+		;;
+
+	    ubuntu-chinese-edition/*/daily-live/*-desktop-*)
+		product="Ubuntu Chinese Desktop $arch"
+		dist="china-$dist"
+		;;
+
+	    *)
+		echo "No iso.qa.ubuntu.com product found for $image; skipping." >&2
+		continue
+		;;
+	esac
+
+	# Try to figure out the path to the OVERSIZED indicator for the build
+	if [ "${image%%/*}" = "ubuntu" ]; then
+		ISO_PATH="${image#*/}"
+	else
+		ISO_PATH=${image}
+	fi
+	ISO_PATH=$(echo $ISO_PATH/$DATE | awk -F / '{print $1"/"$2"/"$4"/"$3}')
+
+	NOTE=""
+	if [ -e "$CDIMAGE_ROOT/www/full/$ISO_PATH.OVERSIZED" ]; then
+		NOTE="<strong>WARNING: This image is OVERSIZED. This should never happen during milestone testing.</strong>"
+	fi
+
+
+	"$POSTER" -t "$dist" -n "$NOTE" "$product" "$DATE" || continue
+done
+
+exit 0

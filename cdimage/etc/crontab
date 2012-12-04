@@ -1,0 +1,14 @@
+PATH=/srv/cdimage.ubuntu.com/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# CD image cron jobs, run out of cdimage's crontab.
+
+31 7 * * *	for-project ubuntu cron.daily; for-project ubuntu cron.daily-live
+17 12 * * 2,6	for-project ubuntu cron.dvd
+14 5 * * *	for-project kubuntu cron.daily; for-project kubuntu cron.daily-live
+44 0 * * *	for-project edubuntu cron.dvd
+55 9 * * *	for-project xubuntu cron.daily-live
+29 6 * * *	for-project ubuntu-server cron.daily
+17 6 * * *	for-project ubuntustudio cron.daily
+19 10 * * *	buildlive mythbuntu; for-project mythbuntu cron.daily-live
+46 4 * * *	build-livecd-base livecd-base
+32 4 * * *	build-livecd-base ubuntu-core daily

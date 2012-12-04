@@ -1,0 +1,96 @@
+#! /usr/bin/python
+#
+# Copyright (C) 2011, 2012 Canonical Ltd.
+# Author: Kate Stewart <kate.stewart@canonical.com>
+# Author: Colin Watson <cjwatson@canonical.com>
+
+"""Find the difference between two manifests.
+
+Compare two manifest file with format of "package version" per line, and
+summarize when a package is in one file but not in another ("<",">").
+If the package is in both manifests, are the versions equal or not ("=","?").
+
+USAGE:
+   diff-manifest manifest1 manifest2
+"""
+
+from __future__ import print_function
+
+import sys
+from optparse import OptionParser
+
+
+def next_package(manifest):
+    """Get the next package name and version information from a manifest.
+    """
+    while manifest:
+        line = manifest.pop(0)
+        if not line:
+            # silently skip empty lines
+            continue
+        bits = line.split()
+        if len(bits) < 2:
+            print("WARNING: '%s' not in format 'package version'" % line,
+                  file=sys.stderr)
+        else:
+            return bits
+    return None
+
+
+def manifest_pairs(ma, mb):
+    """Generate a current pair of packages, one from each manifest to compare.
+    """
+    left = next_package(ma)
+    right = next_package(mb)
+    while left and right:
+        if left[0] == right[0]:
+            yield left, right
+            left = next_package(ma)
+            right = next_package(mb)
+        elif left[0] < right[0]:
+            yield left, None
+            left = next_package(ma)
+        else:  # left[0] > right[0]
+            yield None, right
+            right = next_package(mb)
+    # drain off which ever file still has packages in it
+    while left:
+        yield left, None
+        left = next_package(ma)
+    while right:
+        yield None, right
+        right = next_package(mb)
+
+
+def main():
+    """Create a difference listing of two manifest files.  If a package
+    is present in both files, check if the versions are the same.
+    """
+    parser = OptionParser(usage="Usage: %prog manifest1 manifest2")
+    options, args = parser.parse_args()
+    if len(args) < 2:
+        print("ERROR: Must provide two manifest files to diff",
+              file=sys.stderr)
+        sys.exit(1)
+
+    # create similarily ordered lists from each manifest file
+    with open(args[0]) as mfa:
+        ma = sorted(mfa.readlines())
+    with open(args[1]) as mfb:
+        mb = sorted(mfb.readlines())
+
+    # analyze relation between pairs of packages from manifest lists
+    for a, b in manifest_pairs(ma, mb):
+        if a and b:
+            if a[1] == b[1]:
+                print("= %s\t%s\t%s" % (a[0], a[1], b[1]))
+            else:
+                print("? %s\t%s\t%s" % (a[0], a[1], b[1]))
+        elif a:
+            print("< %s\t%s\t--" % (a[0], a[1]))
+        else:
+            print("> %s\t--\t%s" % (b[0], b[1]))
+
+
+if __name__ == '__main__':
+    sys.exit(main())

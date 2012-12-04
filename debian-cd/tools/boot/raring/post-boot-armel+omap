@@ -1,0 +1,244 @@
+#!/bin/bash
+#
+# Do post-image-building tasks for arm+omap, to make vfat images bootable;
+# this script encapsulates the VFAT image in a PC partition image, with
+# unpartitioned data holding boot data; this is very board specific and targets
+# the Marvell Dove reference boards (e.g. Y0/Y1) but might work on other Dove
+# boards
+#
+# $1 is the CD number
+# $2 is the temporary CD build dir
+# $3 is the image file
+#
+# Copyright (c) 2009 Canonical
+# Authors: Oliver Grawert <ogra@canonical.com>
+#          Loïc Minier <loic.minier@canonical.com>
+#          Michael Casadevall <michael.casadevall@canonical.com>
+#
+# TODO
+# - use safer -m flag of parted (needs a newer parted)
+# - add splash to cmdline (doesn't work right now; LP: #358362)
+
+. "$BASEDIR/tools/boot/$DI_CODENAME/common.sh"
+
+# parted is in /sbin
+PATH="$PATH:/sbin"
+
+set -e
+
+N="$1"
+CDDIR="$2"
+IMAGE="$3"
+
+log() {
+    echo "$*" >&2
+}
+
+die() {
+    log "$@"
+    exit 1
+}
+
+# Only disk 1* bootable
+if ([ "$N" != 1 ] && [ "$N" != 1_NONUS ]) || [ "$CDIMAGE_ADDON" ]; then
+    exit 0
+fi
+
+# We only want to do this for vfat images
+if [ "$IMAGE_FORMAT" == "iso" ]; then
+    exit 0
+fi
+
+cd "$CDDIR/.."
+
+# this script creates an image to write to a SD card with a PC partition table;
+# the first partition is the vfat passed as $3 ($IMAGE) and contains the
+# root fs.
+
+# OMAP3 requires very specific CHS partitioning that can't easy be done with parted
+# so we'll use sfdisk to properly make the necessary partition layout
+
+# globals (please adjust or autodetect or whatever (based on SUBARCH))
+# note thses  paths point to manually unpacked .debs on my disk atm
+
+file_length() {
+    stat -c %s "$1"
+}
+
+extract_file_from_package() {
+    package=$1
+    file_to_extract=$2
+    output_file_name=$3 
+
+    deb="$("$BASEDIR/tools/apt-selection" cache show "$package" | sed -n 's/^Filename: //p')"
+    if [ "$deb" = "" ]; then
+        log "Package $package not found!" 
+        exit 1
+    fi
+
+    tmpdir=`mktemp -d`
+    dpkg --fsys-tarfile "$MIRROR/$deb" | tar xf - -C $tmpdir "./$file_to_extract"
+    mv $tmpdir/$file_to_extract ./$output_file_name
+    rm -rf $tmpdir
+}
+
+# This is common across all configurations
+if [ "${FULLARCH##*+}" = "omap" ]; then
+    path_to_xloader="usr/lib/u-boot/omap3_beagle/MLO"
+
+    uboot_package="u-boot-linaro-omap3-beagle"
+    path_to_uboot="usr/lib/u-boot/omap3_beagle/u-boot.bin"
+
+    xloader_package=$uboot_package
+
+    v_opts=""
+    board_opts=""
+elif [ "${FULLARCH##*+}" = "omap4" ]; then
+    path_to_xloader="usr/lib/u-boot/omap4_panda/MLO"
+
+    uboot_package="u-boot-linaro-omap4-panda"
+    path_to_uboot="usr/lib/u-boot/omap4_panda/u-boot.bin"
+
+    xloader_package=$uboot_package
+
+    board_opts=""
+    v_opts=""
+else
+    die "Unknown OMAP subarch"
+fi
+
+if [ "$PROJECT" = "ubuntu-headless" ] || [ "$PROJECT" = "ubuntu-server" ]; then
+    serial_opts="debian-installer/framebuffer=false console=ttyO2,115200n8"
+fi
+
+log "Extracting bootloader from main archive"
+extract_file_from_package $xloader_package $path_to_xloader "MLO"
+extract_file_from_package $uboot_package $path_to_uboot "u-boot.bin"
+
+uboot_kernel="uImage"
+uboot_initrd="uInitrd"
+uboot_kernel_addr="0x80000000"
+uboot_ramdisk_addr="0x81600000"
+uboot_script_addr="0x1000"
+uenv_script_text="$CDDIR/uEnv.txt"
+preenv_script_text="$CDDIR/preEnv.txt"
+preenv_script_text_serial="$CDDIR/preEnv.txt-serial"
+
+if [ "$CDIMAGE_INSTALL_BASE" = 1 ]; then
+    uboot_desc="Ubuntu Alternate Installer"
+    uboot_input_kernel="$CDDIR/cdrom/uImage.in"
+    uboot_input_initrd="$CDDIR/cdrom/uInitrd.in"
+    uboot_extra_cmdline=" cdrom-detect/try-usb=true"
+
+    mkdir -p "`dirname "$uboot_input_kernel"`"
+    cp -lf "$SUBARCH/cdrom/vmlinuz"   "$uboot_input_kernel"
+    cp -lf "$SUBARCH/cdrom/initrd.gz" "$uboot_input_initrd"
+fi
+
+if [ "$CDIMAGE_LIVE" = 1 ]; then
+    uboot_desc="Ubuntu LiveCD"
+    uboot_input_kernel="$CDDIR/casper/filesystem.kernel-$SUBARCH"
+    uboot_input_initrd="$CDDIR/casper/filesystem.initrd-$SUBARCH"
+    uboot_extra_cmdline=" fixrtc quiet splash -- boot=casper only-ubiquity"
+fi
+
+if [ "$CDIMAGE_PREINSTALLED" = 1 ]; then
+    uboot_desc="Ubuntu Preinstalled Image"
+    uboot_input_kernel="$PREINSTALLEDIMAGES/$FULLARCH.kernel-$SUBARCH"
+    uboot_input_initrd="$PREINSTALLEDIMAGES/$FULLARCH.initrd-$SUBARCH"
+    uboot_extra_cmdline=" root=/dev/mmcblk0p2 fixrtc quiet splash"
+fi
+
+EXT3=$IMAGE.rootfs
+MTOOLSRC=$IMAGE.mtoolsrc
+
+# Turn our kernel and initrd into a uImage and uInitrd
+log "Calling uboot-mkimage on kernel and ramdisk"
+
+rm -f $uboot_kernel $uboot_initrd
+mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 -n "Ubuntu Kernel" -d "$uboot_input_kernel" "$uboot_kernel"
+mkimage -A arm -O linux -T ramdisk -C gzip -a 0x0 -e 0x0 -n "Ubuntu Initrd" -d "$uboot_input_initrd" "$uboot_initrd"
+
+log "Creating default uEnv.txt"
+cat >"$uenv_script_text" <<EOF
+bootcmd=fatload mmc 0:1 0x80000000 uImage;fatload mmc 0:1 0x81600000 uInitrd; bootm 0x80000000 0x81600000
+uenvcmd=boot
+EOF
+
+log "Creating default preEnv.txt"
+cat >"$preenv_script_text" <<EOF
+bootargs=$v_opts $board_opts $DEFAULT_PRESEED $uboot_extra_cmdline
+EOF
+
+if [ -n "$serial_opts" ]; then
+	log "Serial options exist, creating default preEnv.txt-serial"
+cat >"$preenv_script_text_serial" <<EOF
+bootargs=$v_opts $board_opts $DEFAULT_PRESEED $uboot_extra_cmdline $serial_opts
+EOF
+fi
+
+# Move the ext3 filesystem out of the way
+mv $IMAGE $EXT3
+
+# mtools sanity checks are getting in the way, so we need to turn its brain off
+cat > $MTOOLSRC <<EOF
+mtools_skip_check=1
+EOF
+
+export MTOOLSRC
+
+#define sectors per track and number of heads. These need to be in sync
+#with the partition table altering code in the jasper initramfs script.
+
+SPT=32
+HEADS=128
+
+# we leave 72MB for the vfat that carries u-boot, MLO, uImage,
+# uInitrd and boot.scr. The actual partition size is slightly
+# less than 72M as the first track is unused.
+# The root partition starts exactly at 72MB so at a 4MB boundary
+
+LEAD_IN="$(($SPT * 512))"
+BOOT_SIZE="$((72 * 1024 * 1024 - $SPT * 512))"
+BOOT_SIZE_SECTORS="$(($BOOT_SIZE / 512))"
+ROOT_START_SECTOR=$(($SPT + $BOOT_SIZE_SECTORS))
+IMAGE_SIZE="$(file_length "$EXT3")"
+IMG_SIZE_BLOCKS="$((($LEAD_IN + $BOOT_SIZE + $IMAGE_SIZE + 512 - 1) / 512))"
+
+dd if=/dev/zero of="$IMAGE" bs=512 count=0 seek="$IMG_SIZE_BLOCKS" >/dev/null 2>&1
+
+TRG_SIZE="$(file_length "$IMAGE")"
+CYLINDERS="$((($TRG_SIZE/$HEADS/$SPT + 512 -1 )/512))"
+
+#Use sectors as unit, to better control placement of partitions
+{
+    echo $SPT,$BOOT_SIZE_SECTORS,0x0C,*
+    echo $ROOT_START_SECTOR,,,-
+} | sfdisk -L -D -H $HEADS -S $SPT -C $CYLINDERS -uS --force $IMAGE
+
+VATSTART=$(parted $IMAGE unit B print|grep "^ 1"|awk '{print $2}')
+VATSIZE=$(LANG=C fdisk -l ${IMAGE} 2>/dev/null|grep W95 |awk '{print $5}')
+
+mkdosfs -F 32 -C $IMAGE.vfat ${VATSIZE} >/dev/null 2>&1
+mcopy -i $IMAGE.vfat MLO ::MLO
+mcopy -i $IMAGE.vfat u-boot.bin ::u-boot.bin
+mcopy -i $IMAGE.vfat $uboot_kernel ::uImage
+mcopy -i $IMAGE.vfat $uboot_initrd ::uInitrd
+mcopy -i $IMAGE.vfat $uenv_script_text ::uEnv.txt
+mcopy -i $IMAGE.vfat $preenv_script_text ::preEnv.txt
+if [ -e "$preenv_script_text_serial" ]; then
+	mcopy -i $IMAGE.vfat $preenv_script_text_serial ::preEnv.txt-serial
+fi
+
+# now put the whole vfat into the first partition
+dd conv=notrunc bs="${VATSTART%B}" if=$IMAGE.vfat of="$IMAGE" seek=1 >/dev/null 2>&1
+rm $IMAGE.vfat
+
+# put ext3 content into the second partition
+EXT3START=$(parted $IMAGE unit B print|grep "^ 2"|awk '{print $2}')
+dd conv=notrunc bs="${EXT3START%B}" if=$IMAGE.rootfs of="$IMAGE" seek=1 >/dev/null 2>&1
+
+# Cleanup
+rm -f "$IMAGE.rootfs" "$IMAGE.vfat" "$IMAGE.mtoolsrc" MLO u-boot.bin uImage uInitrd
+rm -f "$uboot_script_image" "$uboot_script_image_serial"
+rm -f "$uboot_script_text" "$uboot_script_text_serial"

@@ -2,11 +2,7 @@
 
 BDIR=$TDIR/$CODENAME-$FULLARCH
 
-if [ "$PROJECT" = edubuntu ] && [ "$CDIMAGE_ADDON" != 1 ] && [ "$CDIMAGE_DVD" != 1 ]; then
-	CD=CD2 # old-style add-on CD
-else
-	CD=CD1
-fi
+CD=CD1
 
 if [ -f "$LIVEIMAGES/$ARCH.winfoss.tgz" ]; then
 	tar -C "$BDIR/$CD" -xzf "$LIVEIMAGES/$ARCH.winfoss.tgz"

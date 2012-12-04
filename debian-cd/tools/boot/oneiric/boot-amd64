@@ -47,7 +47,6 @@ fi
 case "$MKISOFS" in
     *xorriso*)
         echo -n "-isohybrid-mbr syslinux/usr/lib/syslinux/isohdpfx.bin " >> $N.mkisofs_opts
-        echo -n "-partition_offset 16 " >> $N.mkisofs_opts
         # uncomment to add a small FAT partition on the media
         # /sbin/mkfs.msdos -n Bla -C test.fat 8192
         # echo -n "-append_partition 2 0x01 test.fat " >> $N.mkisofs_opts
@@ -98,6 +97,7 @@ if [ "$NN" = "1" ]; then
     cp -f $CDDIR/../syslinux/usr/lib/syslinux/isolinux.bin boot$N/isolinux/
     cp -f $CDDIR/../syslinux/usr/lib/syslinux/vesamenu.c32 boot$N/isolinux/
     cp -f $CDDIR/../syslinux/usr/lib/syslinux/gfxboot.c32 boot$N/isolinux/
+    cp -f $CDDIR/../syslinux/usr/lib/syslinux/chain.c32 boot$N/isolinux/
 
     GFXBOOT=
     if THEMEDEB="$($BASEDIR/tools/apt-selection cache show gfxboot-theme-ubuntu)"; then
@@ -463,18 +463,18 @@ label minimalvm=Install a minimal virtual machine
 replace minimalvm=file=/cdrom/preseed/ubuntu-server-minimalvm.seed
 applies minimalvm=install
 EOF
-	# This really ought to be in gfxboot.cfg instead, but we want to
-	# make it particularly prominent.
-	cat >> boot$N/isolinux/txt.cfg <<EOF
+        # This really ought to be in gfxboot.cfg instead, but we want to
+        # make it particularly prominent.
+        cat >> boot$N/isolinux/txt.cfg <<EOF
 label cloud
-  menu label Install Ubuntu ^Enterprise Cloud
+  menu label ^Enlist system with Ubuntu Orchestra Server
   kernel /install/vmlinuz
-  append $KERNEL_PARAMS file=/cdrom/preseed/cloud.seed vga=788 initrd=/install/initrd.gz quiet --
+  append $KERNEL_PARAMS modules=cobbler-enlist-udeb vga=788 initrd=/install/initrd.gz quiet --
 EOF
 	cat >> $CDDIR/boot/grub/grub.cfg <<EOF
-menuentry "Install Ubuntu Enterprise Cloud" {
+menuentry "Enlist system with Ubuntu Orchestra Server" {
 	set gfxpayload=keep
-	linux	/install/vmlinuz $KERNEL_PARAMS file=/cdrom/preseed/cloud.seed quiet --
+	linux	/install/vmlinuz $KERNEL_PARAMS modules=cobbler-enlist-udeb vga=788 initrd=/install/initrd.gz quiet --
 	initrd	/install/initrd.gz
 }
 EOF

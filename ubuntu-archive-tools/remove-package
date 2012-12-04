@@ -1,0 +1,124 @@
+#! /usr/bin/python
+
+# Copyright 2012 Canonical Ltd.
+# Author: Colin Watson <cjwatson@ubuntu.com>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 3 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Remove a package from the archive."""
+
+from __future__ import print_function
+
+from optparse import OptionParser
+import sys
+
+from launchpadlib.launchpad import Launchpad
+from ubuntutools.question import YesNoQuestion
+
+import lputils
+
+
+def find_removables(options, package):
+    if options.binaryonly:
+        for binary in lputils.find_latest_published_binaries(options, package):
+            yield binary, True
+    else:
+        source = lputils.find_latest_published_source(options, package)
+        yield source, True
+        for binary in source.getPublishedBinaries():
+            yield binary, False
+
+
+def find_all_removables(options, packages):
+    for package in packages:
+        for removable in find_removables(options, package):
+            yield removable
+
+
+def remove_package(options, packages):
+    removables = []
+
+    print("Removing packages from %s:" % (options.suite))
+    try:
+        for removable, direct in find_all_removables(options, packages):
+            removables.append((removable, direct))
+            print("\t%s%s" % ("" if direct else "\t", removable.display_name))
+    except lputils.PackageMissing as message:
+        print(message, ".  Exiting.")
+        sys.exit(1)
+    print("Comment: %s" % options.removal_comment)
+
+    if options.dry_run:
+        print("Dry run; no packages removed.")
+    else:
+        if not options.confirm_all:
+            if YesNoQuestion().ask("Remove", "no") == "no":
+                return
+
+        removals = []
+        for removable, direct in removables:
+            if direct:
+                removable.requestDeletion(
+                    removal_comment=options.removal_comment)
+                removals.append(removable)
+
+        print("%d %s successfully removed." %
+              (len(removals), "package" if len(removals) == 1 else "packages"))
+
+
+def main():
+    parser = OptionParser(
+        usage='usage: %prog -m "comment" [options] package [...]')
+    parser.add_option(
+        "-l", "--launchpad", dest="launchpad_instance", default="production")
+    parser.add_option(
+        "-n", "--dry-run", default=False, action="store_true",
+        help="only show removals that would be performed")
+    parser.add_option(
+        "-y", "--confirm-all", default=False, action="store_true",
+        help="do not ask for confirmation")
+    parser.add_option(
+        "-d", "--distribution", default="ubuntu",
+        metavar="DISTRIBUTION", help="remove from DISTRIBUTION")
+    parser.add_option(
+        "-s", "--suite", metavar="SUITE", help="remove from SUITE")
+    parser.add_option(
+        "-a", "--architecture",
+        metavar="ARCHITECTURE", help="architecture tag")
+    parser.add_option(
+        "-e", "--version",
+        metavar="VERSION", help="package version (default: current version)")
+    parser.add_option("-p", "--ppa", metavar="OWNER", help="PPA owner name")
+    parser.add_option("--ppa-name", metavar="NAME", help="PPA name")
+    parser.add_option(
+        "-j", "--partner", default=False, action="store_true",
+        help="remove from partner archive")
+    parser.add_option(
+        "-b", "--binary", dest="binaryonly",
+        default=False, action="store_true", help="remove binaries only")
+    parser.add_option("-m", "--removal-comment", help="removal comment")
+    options, args = parser.parse_args()
+
+    options.launchpad = Launchpad.login_with(
+        "remove-package", options.launchpad_instance)
+    lputils.setup_location(options)
+
+    if options.removal_comment is None:
+        parser.error(
+            "You must provide a comment/reason for all package removals.")
+
+    remove_package(options, args)
+
+
+if __name__ == '__main__':
+    main()
