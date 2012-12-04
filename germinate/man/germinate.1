@@ -14,9 +14,9 @@
 .Op Fl d Ar dist Ns \&,...
 .Op Fl a Ar arch
 .Op Fl c Ar component Ns \&,...
-.Op Fl i
 .Op Fl Fl bzr
 .Op Fl Fl no\-rdepends
+.Op Fl Fl no\-installer
 .Sh DESCRIPTION
 .Nm
 is a program to help with the maintenance of large software distributions.
@@ -215,7 +215,7 @@ then you would use the options
 Fetch seeds for distribution
 .Ar dist .
 The default is
-.Li ubuntu.natty .
+.Li ubuntu.oneiric .
 .It Xo Fl m ,
 .Fl Fl mirror Ar mirror
 .Xc
@@ -236,7 +236,7 @@ across all archives will win.
 .Xc
 Operate on the specified distributions.
 The default is
-.Li natty .
+.Li oneiric .
 Listing multiple distributions may be useful, for example, when examining
 both a released distribution and its security updates.
 .It Xo Fl a ,
@@ -252,11 +252,6 @@ The default is
 Operate on the specified components.
 The default is
 .Li main .
-.It Xo Fl i ,
-.Fl Fl ipv6
-.Xc
-Check IPv6 status of source packages, using the statistics available at
-.Pa http://debdev.fabbione.net/stat/ .
 .It Fl Fl bzr
 Check out seeds from the
 .Ic bzr
@@ -272,6 +267,9 @@ These calculations cause a large number of small files to be written out in
 the
 .Pa rdepends/
 directory, and may take some time.
+.It Fl Fl no\-installer
+Do not consider debian-installer udeb packages.
+While generally not the desired outcome, sometimes you might wish to omit consideration of installer packages when processing your seeds, perhaps if sending the output directly to the package manager on an already-installed system.
 .It Fl Fl seed\-packages Ar parent Ns / Ns Ar pkg Ns \&,...
 Treat each
 .Ar pkg

@@ -1,3 +1,62 @@
+germinate (1.28) UNRELEASED; urgency=low
+
+  * Make sure to always close files after finishing with them.  Mostly this
+    is done using the 'with' statement in Python 2.6, but pychecker gets
+    unhappy with contextlib.closing so I carried on using traditional
+    try/finally blocks in cases that would require that.
+  * Remove all uses of os.system and os.popen, replacing them with uses of
+    the better-designed subprocess module.
+  * Move output-writing functions from the top-level germinate program into
+    Germinator.
+  * Remove all code supporting the germinate -i/--ipv6 option; this has been
+    off by default since November 2004, the service behind this was
+    discontinued in March 2007
+    (http://lists.debian.org/debian-ipv6/2007/02/msg00015.html), and
+    germinate was never a great place to track this kind of thing anyway.
+  * Convert all option parsing to optparse.  Consolidate defaults into a new
+    Germinate.defaults module.
+  * Update copyright dates.
+  * Redesign how Germinator gets Packages/Sources sections from the archive.
+    This now works via an abstract interface, which should make it easier to
+    plug in alternative archive sources (e.g. a database).
+  * Move all apt_pkg interaction into library code.  Germinator.__init__ now
+    takes an architecture argument so that it can set APT::Architecture.
+  * Turn open_seed into a Seed class, allowing it to be a context manager.
+  * Move code pertaining to the structure of seeds into a SeedStructure
+    class, simplifying the interface.
+  * Make all module names lower-case, per PEP-8.  Remove the separate
+    Germinate.Archive.tagfile module; this is now in germinate.archive
+    directly.  Adjust build system and pychecker handling to support this.
+  * Remove unnecessary logging helper functions.
+  * Don't modify level names on the root logger simply as a result of
+    importing germinate.germinator; move this into a function.
+  * Prefix all private methods with an underscore.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 19 Oct 2011 22:53:40 +0100
+
+germinate (1.27) unstable; urgency=low
+
+  [ Alexandros Frantzis ]
+  * Change local tag file name format to permit multiple repositories on the
+    same host (LP: #634831).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 25 Aug 2011 16:32:12 +0100
+
+germinate (1.26) unstable; urgency=low
+
+  * Use 'bzr branch' rather than 'bzr get'; the latter is apparently
+    deprecated in bzr 2.4.
+  * Change default distribution to oneiric.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 12 Aug 2011 13:25:22 +0100
+
+germinate (1.25.1) unstable; urgency=low
+
+  * Add a new option, --no-installer, allowing one to process seeds
+    without considering debian-installer udebs in the output.
+
+ -- Adam Conrad <adconrad@0c3.net>  Thu, 21 Jul 2011 22:19:29 -0600
+
 germinate (1.25) unstable; urgency=low
 
   * Only raise an exception from open_tag_files if an appropriate file is

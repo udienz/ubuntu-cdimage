@@ -61,7 +61,7 @@ if [ -z "$CAPPROJECT" ]; then
 fi
 
 if [ -z "$DIST" ]; then
-  DIST=karmic
+  DIST=precise
 fi
 
 # The debian-cd dir
@@ -144,12 +144,13 @@ case $DIST in
     export PREV_CODENAME=karmic
     export CODENAME=lucid
     export CAPCODENAME='Lucid Lynx'
-    export DEBVERSION=10.04.3
+    export DEBVERSION=10.04.4
     case $PROJECT in
       ubuntu|ubuntu-server|kubuntu)
 	DEBVERSION="$DEBVERSION LTS"
 	;;
     esac
+    export BACKPORT_KERNELS="oneiric"
     export OFFICIAL="Release"
     ;;
   maverick)
@@ -171,6 +172,34 @@ case $DIST in
     export CODENAME=oneiric
     export CAPCODENAME='Oneiric Ocelot'
     export DEBVERSION=11.10
+    export OFFICIAL="Release"
+    ;;
+  precise)
+    export PREV_CODENAME=lucid # need to support upgrades from previous LTS
+    export CODENAME=precise
+    export CAPCODENAME='Precise Pangolin'
+    export DEBVERSION=12.04.2
+    case $PROJECT in
+      ubuntu|ubuntu-server|kubuntu|edubuntu*|xubuntu)
+	DEBVERSION="$DEBVERSION LTS"
+	;;
+    esac
+    # Note that this is singular, unlike lucid; we only ship a single kernel.
+    export BACKPORT_KERNEL=quantal
+    export OFFICIAL="Release"
+    ;;
+  quantal)
+    export PREV_CODENAME=precise
+    export CODENAME=quantal
+    export CAPCODENAME='Quantal Quetzal'
+    export DEBVERSION=12.10
+    export OFFICIAL="Release"
+    ;;
+  raring)
+    export PREV_CODENAME=quantal
+    export CODENAME=raring
+    export CAPCODENAME='Raring Ringtail'
+    export DEBVERSION=13.04
     export OFFICIAL="Alpha"
     ;;
 esac
@@ -212,23 +241,23 @@ export MIRROR=${MIRROR:-$CDIMAGE_ROOT/ftp}
 #export FORCENONUSONCD1=1
 
 # Path of the temporary directory
-export TDIR=$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/tmp
+export TDIR=$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE/tmp
 
 # Path where the images will be written
-export OUT=$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/debian-cd
+export OUT=$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE/debian-cd
 
 # Where we keep the temporary apt stuff.
 # This cannot reside on an NFS mount.
-export APTTMP=$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/apt
+export APTTMP=$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE/apt
 
 # Where extracted debootstrap scripts live
-export DEBOOTSTRAP=$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/debootstrap
+export DEBOOTSTRAP=$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE/debootstrap
 
 # Where live filesystem images live
-export LIVEIMAGES=$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/live
+export LIVEIMAGES=$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE/live
 
 # Where preinstalled filesystem images live
-export PREINSTALLEDIMAGES=$CDIMAGE_ROOT/scratch/$PROJECT/$IMAGE_TYPE/preinstalled
+export PREINSTALLEDIMAGES=$CDIMAGE_ROOT/scratch/$PROJECT/$DIST/$IMAGE_TYPE/preinstalled
 
 # Do I want to have NONFREE merged in the CD set
 # export NONFREE=1
@@ -287,7 +316,7 @@ esac
 export UPDATES=1
 
 case $DIST in
-  lucid)
+  precise)
     #export PROPOSED=1
     ;;
 esac
@@ -320,6 +349,11 @@ case $DIST in
     export i386_MKISOFS_OPTS="-as mkisofs -r -checksum_algorithm_iso md5,sha1"
     export amd64_MKISOFS="xorriso"
     export amd64_MKISOFS_OPTS="-as mkisofs -r -checksum_algorithm_iso md5,sha1"
+    # temporary hack until such time as we can upgrade all builds to 1.2.4
+    new_xorriso="/home/cdimage/xorriso/xorriso-1.2.4/xorriso/xorriso"
+    if [ -x "$new_xorriso" ]; then
+      export amd64_MKISOFS="$new_xorriso"
+    fi
     ;;
 esac
 
@@ -377,7 +411,7 @@ fi
 # This is the expected filesystem that is downloaded from the livefs builders
 
 if [ -z "$PREINSTALLED_IMAGE_FILESYSTEM" ]; then
-  export PREINSTALLED_IMAGE_FILESYSTEM=ext3
+  export PREINSTALLED_IMAGE_FILESYSTEM=ext4
 fi
 
 # Produce jigdo files:

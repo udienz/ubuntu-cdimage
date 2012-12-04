@@ -8,9 +8,7 @@
 #   local_directory
 # For a list of public mirrors, see: https://wiki.ubuntu.com/Archive
 #
-
-#RSYNC_SRC=ftp.tw.debian.org::ubuntu
-RSYNC_SRC=repo.ugm.ac.id::ubuntu
+# RSYNC_SRC=mirnyy.ubuntu.com::ftp
 
 # Additional rsync options when synchronizing our local Ubuntu mirror before the
 # build.  Use this to exclude architectures, file types etc. that you don't need

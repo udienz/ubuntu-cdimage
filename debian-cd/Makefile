@@ -115,6 +115,14 @@ ifneq (${ARCH_MKISOFS_OPTS},)
     MKISOFS_OPTS = ${ARCH_MKISOFS_OPTS}
 endif
 
+ifeq ($(CDIMAGE_LIVE),1)
+LIVE_FILESYSTEM := 1
+else ifeq ($(CDIMAGE_SQUASHFS_BASE),1)
+LIVE_FILESYSTEM := 1
+else
+LIVE_FILESYSTEM :=
+endif
+
 ## Internal variables  
 apt=$(BASEDIR)/tools/apt-selection
 list2cds=$(BASEDIR)/tools/list2cds
@@ -133,6 +141,7 @@ strip_nonus_bin=$(BASEDIR)/tools/strip-nonUS-bin
 add_secured=$(BASEDIR)/tools/add_secured
 md5sum=/usr/bin/md5sum
 sha1sum=/usr/bin/sha1sum
+sha256sum=/usr/bin/sha256sum
 fastsums=$(BASEDIR)/tools/fast_sums
 jigdo_cleanup=$(BASEDIR)/tools/jigdo_cleanup
 grab_md5=$(BASEDIR)/tools/grab_md5
@@ -155,8 +164,8 @@ else
 forcenonusoncd1=0
 endif
 
-# we don't know how to generate ISOs for armel/iMX51; force vfat images
-ifeq ($(ARCH),armel)
+# we don't know how to generate ISOs for arm; force vfat images
+ifneq (,$(findstring $(ARCH),armel armhf))
 IMAGE_FORMAT := vfat
 endif
 
@@ -478,7 +487,7 @@ ifdef FORCENONUSONCD1
 		grep-dctrl -FSection -n -sPackage -e '^(non-US|non-us)' - | \
 		sort | uniq > $(BDIR)/$(CAPPROJECT)_$(CODENAME)_nonUS
 endif
-	$(Q)if [ -x "/usr/sbin/debootstrap" -a _$(INSTALLER_CD) != _1 ]; then \
+	$(Q)if [ -x "/usr/sbin/debootstrap" -a _$(INSTALLER_CD) != _1 -a _$(CDIMAGE_SQUASHFS_BASE) != _1 ]; then \
 		mkdir -p $(DEBOOTSTRAP)/tmp-$(ARCH) ; \
 		$(DEBOOTSTRAPROOT) /usr/sbin/debootstrap --arch $(ARCH) --print-debs $(CODENAME) $(DEBOOTSTRAP)/tmp-$(ARCH) file://$(MIRROR) $(DEBOOTSTRAP)/$(CODENAME)-$(FULLARCH) \
 		| tr ' ' '\n' >>$(BDIR)/rawlist.debootstrap; \
@@ -623,6 +632,7 @@ $(BDIR)/packages-stamp:
 	@echo "Adding the selected packages to each CD :"
 ifeq ($(CDIMAGE_INSTALL_BASE),1)
 ifneq ($(CDIMAGE_ADDON),1)
+ifneq ($(CDIMAGE_SQUASHFS_BASE),1)
 	@# Check that all packages required by debootstrap are included
 	@# and create .disk/base_installable if yes
 	@# Also create .disk/base_components
@@ -700,8 +710,9 @@ ifneq ($(CDIMAGE_ADDON),1)
 	    fi; \
 	done
 endif
-else
-ifeq ($(CDIMAGE_LIVE),1)
+endif
+endif
+ifeq ($(LIVE_FILESYSTEM),1)
 	@# Ubuntu live CDs are installable too
 	touch $(BDIR)/CD1/.disk/base_installable
 	if [ "$$CDIMAGE_DVD" = 1 ]; then \
@@ -709,7 +720,6 @@ ifeq ($(CDIMAGE_LIVE),1)
 	else \
 	    echo 'full_cd/single' > $(BDIR)/CD1/.disk/cd_type; \
 	fi
-endif
 endif
 	$(Q)set -e; \
 	 for i in $(BDIR)/*.packages; do \
@@ -732,16 +742,11 @@ endif
 		dir=$(BDIR)/CD$$dir; \
 		$(scanpackages) install $$dir; \
 	done
-ifeq ($(CDIMAGE_LIVE),1)
+ifeq ($(LIVE_FILESYSTEM),1)
 	$(Q)$(add_live_filesystem)
-ifneq ($(PROJECT),edubuntu)
+endif
+ifeq ($(CDIMAGE_LIVE),1)
 	$(Q)$(add_winfoss)
-endif
-endif
-ifeq ($(PROJECT),edubuntu)
-ifeq ($(CDIMAGE_INSTALL),1)
-	$(Q)$(add_winfoss)
-endif
 endif
 	$(Q)touch $(BDIR)/packages-stamp
 
@@ -899,6 +904,8 @@ ifdef BOOTDISKS
 endif
 
 ifneq ($(CDIMAGE_INSTALL_BASE),1)
+upgrade:
+else ifeq ($(CDIMAGE_SQUASHFS_BASE),1)
 upgrade:
 else
 upgrade: ok bin-infos $(BDIR)/upgrade-stamp
@@ -1091,13 +1098,20 @@ bin-images: ok bin-md5list $(OUT)
 			$(OUT)/$(call CDBASE,$$n).raw; \
 		fi; \
 	done
-ifeq ($(CDIMAGE_LIVE),1)
+ifeq ($(LIVE_FILESYSTEM),1)
 	-cp -a $(LIVEIMAGES)/$(FULLARCH).manifest $(OUT)/$(call CDBASE,$$n).manifest
 	-if [ -e $(LIVEIMAGES)/$(FULLARCH).manifest-remove ]; then \
 		cp -a $(LIVEIMAGES)/$(FULLARCH).manifest-remove $(OUT)/$(call CDBASE,$$n).manifest-remove; \
-	else \
+	elif [ -e $(LIVEIMAGES)/$(FULLARCH).manifest-desktop ]; then \
 		cp -a $(LIVEIMAGES)/$(FULLARCH).manifest-desktop $(OUT)/$(call CDBASE,$$n).manifest-desktop; \
 	fi
+ifeq ($(CDIMAGE_SQUASHFS_BASE),1)
+	-cp -a $(LIVEIMAGES)/$(FULLARCH).squashfs $(OUT)/$(call CDBASE,$$n).squashfs
+endif
+endif
+
+ifeq ($(SUBARCH),ac100)
+PREINSTALLED_IMAGE_FILESYSTEM := rootfs.tar.gz
 endif
 
 bin-preinstalled_images: ok $(OUT)
@@ -1107,15 +1121,15 @@ bin-preinstalled_images: ok $(OUT)
 	if [ ! -e "$(PREINSTALLEDIMAGES)/$(FULLARCH).$(PREINSTALLED_IMAGE_FILESYSTEM)" ]; then \
 		echo "No filesystem for $(FULLARCH)!" >&2; \
 		exit 1;	\
-	fi;
-	mv $(PREINSTALLEDIMAGES)/$(FULLARCH).$(PREINSTALLED_IMAGE_FILESYSTEM) $(OUT)/$(call CDBASE,1).raw; 
+	fi; \
+	mv $(PREINSTALLEDIMAGES)/$(FULLARCH).$(PREINSTALLED_IMAGE_FILESYSTEM) $(OUT)/$(call CDBASE,1).raw; \
 	if [ -f $(BASEDIR)/tools/boot/$(DI_CODENAME)/post-boot-$(FULLARCH) ]; then \
 		$(BASEDIR)/tools/boot/$(DI_CODENAME)/post-boot-$(FULLARCH) 1 $(BDIR)/CD1 \
 		$(OUT)/$(call CDBASE,1).raw; \
 	elif [ -f $(BASEDIR)/tools/boot/$(DI_CODENAME)/post-boot-$(ARCH) ]; then \
 		$(BASEDIR)/tools/boot/$(DI_CODENAME)/post-boot-$(ARCH) 1 $(BDIR)/CD1 \
 		$(OUT)/$(call CDBASE,1).raw; \
-	fi
+	fi; 
 	-cp -a $(PREINSTALLEDIMAGES)/$(FULLARCH).manifest $(OUT)/$(call CDBASE,$$n).manifest
 	-if [ -e $(PREINSTALLEDIMAGES)/$(FULLARCH).manifest-remove ]; then \
 		cp -a $(PREINSTALLEDIMAGES)/$(FULLARCH).manifest-remove $(OUT)/$(call CDBASE,$$n).manifest-remove; \
@@ -1130,8 +1144,14 @@ bin-compress_images: ok $(OUT)
 		exit 1; \
 	fi;
 	@file -b $(OUT)/$(call CDBASE,1).raw > $(OUT)/$(call CDBASE,1).type
-	@gzip -9 --rsyncable $(OUT)/$(call CDBASE,1).raw;
-	@mv $(OUT)/$(call CDBASE,1).raw.gz $(OUT)/$(call CDBASE,1).raw; 
+	@if ! grep -q '^gzip' $(OUT)/$(call CDBASE,1).type; then \
+		set -e; \
+		gzip -9 --rsyncable $(OUT)/$(call CDBASE,1).raw; \
+		mv $(OUT)/$(call CDBASE,1).raw.gz $(OUT)/$(call CDBASE,1).raw; \
+	fi;
+	@if [ "$(PREINSTALLED_IMAGE_FILESYSTEM)" = "rootfs.tar.gz" ]; then \
+		echo "tar archive" > $(OUT)/$(call CDBASE,1).type; \
+	fi;
 
 src-images: ok src-md5list $(OUT)
 	@echo "Generating the source iso/jigdo images ..."
@@ -1231,6 +1251,7 @@ imagesums:
 	$(Q)cd $(OUT); :> MD5SUMS; :> SHA1SUMS; for file in `find * -name \*.raw`; do \
 		$(md5sum) "$$file" >>MD5SUMS; \
 		$(sha1sum) "$$file" >>SHA1SUMS; \
+		$(sha256sum) "$$file" >>SHA256SUMS; \
 	done; \
 	for file in `find * -name \*.template`; do \
 		if [ "`tail --bytes=33 "$$file" | head --bytes=1 | od -tx1 -An | sed -e 's/ //g'`" != 05 ]; then \

@@ -813,7 +813,17 @@ static collpackagelist **get_matching_low(collpackagelist **addto,
 		                          dpkg_packages *pkgs, dependency *dep)
 {
     virtualpkg *vpkg;
-    for (vpkg = lookup_virtualpkgtbl(pkgs->virtualpkgs, dep->package);
+    char *dep_pkgname, *colon;
+
+    dep_pkgname = strdup(dep->package);
+    /* dependencies might be specified as pkgname:architecture or pkgname:any,
+     * cut this off; this is not entirely correct, but good enough for our
+     * purposes */
+    colon = strchr(dep_pkgname, ':');
+    if (colon != NULL)
+	*colon = '\0';
+
+    for (vpkg = lookup_virtualpkgtbl(pkgs->virtualpkgs, dep_pkgname);
 	 vpkg != NULL;
 	 vpkg = vpkg->next)
     {
@@ -834,6 +844,7 @@ static collpackagelist **get_matching_low(collpackagelist **addto,
 	}
     }
 
+    free(dep_pkgname);
     return addto;
 }
 

@@ -9,7 +9,7 @@ rm -rf "$OUT"
 TMP_OUT=$OUT
 
 if [ -z "$ARCHES" ]; then
-	export ARCHES='amd64 i386 powerpc'
+	export ARCHES='i386 amd64'
 fi
 
 for FULLARCH in $ARCHES
@@ -79,29 +79,24 @@ do
 	   [ "$SPECIAL" != 1 ] && [ "$CDIMAGE_NOSOURCE" != 1 ]; then
 		if [ "$CDIMAGE_ONLYSOURCE" != 1 ]; then
 			make list $SIZE_ARGS SRCSIZELIMIT=$FULL_SIZE
-
-			export OUT="$TMP_OUT/$FULLARCH"; mkdir -p $OUT
-			make bin-official_images $SIZE_ARGS SRCSIZELIMIT=$FULL_SIZE
-			echo Generating MD5Sums of the images
-			make imagesums
-			echo Generating list files for images
-			make pi-makelist
 		else
 			make src-list SRCSIZELIMIT=$FULL_SIZE
 		fi
-
 		export OUT="$TMP_OUT/src"; mkdir -p $OUT
 		make src-official_images $SIZE_ARGS SRCSIZELIMIT=$FULL_SIZE
-		echo Generating MD5Sums of the images
+		echo Generating MD5Sums of the source images
 		make imagesums
-		echo Generating list files for images
+		echo Generating list files for source images
 		make pi-makelist
+		if [ "$CDIMAGE_ONLYSOURCE" != 1 ]; then
+			export OUT="$TMP_OUT/$FULLARCH"; mkdir -p $OUT
+			make bin-official_images $SIZE_ARGS SRCSIZELIMIT=$FULL_SIZE
+			echo Generating list files for images
+			make pi-makelist
+		fi
 	elif [ "$CDIMAGE_PREINSTALLED" = 1 ]; then
 		export OUT="$TMP_OUT/$FULLARCH"; mkdir -p $OUT
 		make bin-preinstalled_images
-
-		echo Generating MD5Sums of the images
-		make imagesums
 	else
 		make bin-list $SIZE_ARGS SRCSIZELIMIT=$FULL_SIZE
 		export OUT=$TMP_OUT/$FULLARCH; mkdir -p $OUT
@@ -118,14 +113,16 @@ do
 				continue
 			fi
 		fi
-		echo Generating MD5Sums of the images
-		make imagesums
 		echo Generating list files for images
 		make pi-makelist
 	fi
 	if [ "$CDIMAGE_COMPRESS" = 1 ]; then
 		echo Compressing CD images
 		make bin-compress_images
+	fi
+	if [ "$CDIMAGE_ONLYSOURCE" != 1 ]; then
+		echo Generating MD5Sums of the binary images
+		make imagesums
 	fi
 	echo "--------------- `date` ---------------"
 done
